@@ -1,0 +1,16 @@
+domain: payu.com
+layout:
+- go.kubebuilder.io/v4-alpha
+projectName: k8s-s3-operator
+repo: github.com/PayU/K8s-S3-Operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: payu.com
+  group: s3operator
+  kind: S3Bucket
+  path: github.com/PayU/K8s-S3-Operator/api/v1
+  version: v1
+version: "3"
