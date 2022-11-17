@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -25,12 +26,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
+	"github.com/go-logr/logr"
 )
 
 // S3BucketReconciler reconciles a S3Bucket object
 type S3BucketReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Log    logr.Logger
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
@@ -49,9 +52,16 @@ type S3BucketReconciler struct {
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
+	var s3Bucket s3operatorv1.S3Bucket
+	if err := r.Get(ctx, req.NamespacedName, &s3Bucket); err != nil {
+		r.Log.Error(err, "error with geting s3 bucket")
+		return ctrl.Result{}, nil
+	}
+	r.Log.Info("reconcile loop", "bucketName", s3Bucket.Spec.BucketName)
+
 	// TODO(user): your logic here
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{Requeue: true, RequeueAfter: 15 * time.Second}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

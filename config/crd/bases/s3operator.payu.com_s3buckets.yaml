@@ -35,13 +35,29 @@ spec:
           spec:
             description: S3BucketSpec defines the desired state of S3Bucket
             properties:
-              foo:
-                description: Foo is an example field of S3Bucket. Edit s3bucket_types.go
-                  to remove/update
+              accessControl:
                 type: string
+              bucketName:
+                type: string
+              bucketPolicy:
+                type: string
+              region:
+                type: string
+              tags:
+                additionalProperties:
+                  type: string
+                type: object
+            required:
+            - bucketName
+            - region
             type: object
           status:
             description: S3BucketStatus defines the observed state of S3Bucket
+            properties:
+              isReady:
+                type: boolean
+            required:
+            - isReady
             type: object
         type: object
     served: true

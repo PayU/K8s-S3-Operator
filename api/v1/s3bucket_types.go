@@ -28,14 +28,23 @@ type S3BucketSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of S3Bucket. Edit s3bucket_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	BucketName string `json:"bucketName"`
+
+	Region string `json:"region"`
+
+	// +optional
+	AccessControl string `json:"accessControl"`
+
+	// +optional
+	Tags map[string]string `json:"tags,omitempty"`
+
+	// +optional
+	BucketPolicy string `json:"bucketPolicy,omitempty"`
 }
 
 // S3BucketStatus defines the observed state of S3Bucket
 type S3BucketStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	IsReady bool `json:"isReady"`
 }
 
 //+kubebuilder:object:root=true
