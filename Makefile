@@ -2,7 +2,7 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:local
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.25.0
+ENVTEST_K8S_VERSION = 1.20.
 
 CLUSTER_NAME = kind-cluster
 
@@ -171,5 +171,4 @@ kind-load-controller:
 .PHONY:run-local-aws
 run-local-aws:
 	docker run --rm -it -p 4566:4566 -p 4510-4559:4510-4559 localstack/localstack
-
 
