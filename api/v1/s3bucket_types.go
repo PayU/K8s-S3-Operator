@@ -20,26 +20,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // S3BucketSpec defines the desired state of S3Bucket
 type S3BucketSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 
+	// +kubebuilder:validation:MinLength:=3
+	// +kubebuilder:validation:MaxLength:=63
+	// +kubebuilder:validation:Pattern:=(?!(^xn--|.+-s3alias$))^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$
 	BucketName string `json:"bucketName"`
 
+	// +kubebuilder:validation:Pattern:=(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d
 	Region string `json:"region"`
-
-	// +optional
-	AccessControl string `json:"accessControl"`
 
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`
 
-	// +optional
-	BucketPolicy string `json:"bucketPolicy,omitempty"`
 }
 
 // S3BucketStatus defines the observed state of S3Bucket

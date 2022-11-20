@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,7 +49,6 @@ type S3BucketReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
 
 	var s3Bucket s3operatorv1.S3Bucket
 	if err := r.Get(ctx, req.NamespacedName, &s3Bucket); err != nil {
@@ -61,7 +59,7 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// TODO(user): your logic here
 
-	return ctrl.Result{Requeue: true, RequeueAfter: 15 * time.Second}, nil
+	return ctrl.Result{Requeue: true}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
