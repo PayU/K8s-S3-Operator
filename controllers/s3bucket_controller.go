@@ -25,6 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"github.com/PayU/K8s-S3-Operator/controllers/aws/awsClient"
 )
 
 // S3BucketReconciler reconciles a S3Bucket object
@@ -32,8 +33,8 @@ type S3BucketReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	Log    logr.Logger
+	awsClient *awsClient
 }
-
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets/finalizers,verbs=update
@@ -55,7 +56,9 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	// TODO(user): your logic here
+	if !s3Bucket.Status.IsCreated{
+		awsClient.creatBucket(awsClient.CreateBucketInput)
+	}
 
 	return ctrl.Result{Requeue: true}, nil
 }
