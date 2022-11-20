@@ -9,5 +9,5 @@ metadata:
     app.kubernetes.io/created-by: k8s-s3-operator
   name: s3bucket-sample
 spec:
-  bucketName: niv-bucket
-  region: my-region
+  bucketName: nivbucket
+  region: us-east-2

@@ -25,15 +25,17 @@ type S3BucketSpec struct {
 
 	// +kubebuilder:validation:MinLength:=3
 	// +kubebuilder:validation:MaxLength:=63
-	// +kubebuilder:validation:Pattern:=(?!(^xn--|.+-s3alias$))^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$
+	// +kubebuilder:validation:XIntOrString
+	// +kubebuilder:validation:Pattern:=^[a-z0-9][a-z0-9-]*[a-z0-9]$
+
 	BucketName string `json:"bucketName"`
 
+	// +kubebuilder:validation:XIntOrString
 	// +kubebuilder:validation:Pattern:=(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d
 	Region string `json:"region"`
 
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`
-
 }
 
 // S3BucketStatus defines the observed state of S3Bucket

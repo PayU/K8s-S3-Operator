@@ -19,13 +19,12 @@ package controllers
 import (
 	"context"
 
+	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
-	"github.com/go-logr/logr"
 )
 
 // S3BucketReconciler reconciles a S3Bucket object
@@ -49,13 +48,12 @@ type S3BucketReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
+	logger := log.FromContext(ctx)
 	var s3Bucket s3operatorv1.S3Bucket
-	if err := r.Get(ctx, req.NamespacedName, &s3Bucket); err != nil {
-		r.Log.Error(err, "error with geting s3 bucket")
+	if err := r.Get(context.Background(), req.NamespacedName, &s3Bucket); err != nil {
+		logger.Error(err,"error with geting s3 bucket")
 		return ctrl.Result{}, nil
 	}
-	r.Log.Info("reconcile loop", "bucketName", s3Bucket.Spec.BucketName)
 
 	// TODO(user): your logic here
 

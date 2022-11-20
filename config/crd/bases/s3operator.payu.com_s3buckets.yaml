@@ -35,14 +35,16 @@ spec:
           spec:
             description: S3BucketSpec defines the desired state of S3Bucket
             properties:
-              accessControl:
-                type: string
               bucketName:
+                maxLength: 63
+                minLength: 3
+                pattern: ^[a-z0-9][a-z0-9-]*[a-z0-9]$
                 type: string
-              bucketPolicy:
-                type: string
+                x-kubernetes-int-or-string: true
               region:
+                pattern: (us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d
                 type: string
+                x-kubernetes-int-or-string: true
               tags:
                 additionalProperties:
                   type: string

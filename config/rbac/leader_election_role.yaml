@@ -12,9 +12,27 @@ metadata:
   name: leader-election-role
 rules:
 - apiGroups:
+  - "*"
+  resources:
+  - configmaps
+  - pods
+  - services
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - ""
   resources:
   - configmaps
+  - pods
+  - services
+  - leases
   verbs:
   - get
   - list
