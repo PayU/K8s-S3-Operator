@@ -1,5 +1,5 @@
-CLUSTER_NAME=kind-cluster
-IMG ?= controller:local
+CLUSTER_NAME=s3operator-cluster
+IMG = controller:local
 
 make create-local-cluster
 current_context=$(kubectl config current-context)

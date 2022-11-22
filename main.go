@@ -61,6 +61,8 @@ func main() {
 	opts := zap.Options{
 		Development: true,
 	}
+	os.Setenv("AWS_ACCESS_KEY_ID", "test")
+	os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 

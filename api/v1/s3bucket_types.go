@@ -36,6 +36,10 @@ type S3BucketSpec struct {
 
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`
+
+	// +optional
+	// +kubebuilder:default:=false
+	Encryption bool `json:"encryption,omitempty"`
 }
 
 // S3BucketStatus defines the observed state of S3Bucket

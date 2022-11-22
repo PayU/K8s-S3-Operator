@@ -171,4 +171,3 @@ kind-load-controller:
 .PHONY:run-local-aws
 run-local-aws:
 	docker run --rm -it -p 4566:4566 -p 4510-4559:4510-4559 localstack/localstack
-

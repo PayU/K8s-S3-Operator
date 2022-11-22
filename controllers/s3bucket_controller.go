@@ -20,21 +20,23 @@ import (
 	"context"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
+	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
+
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"github.com/PayU/K8s-S3-Operator/controllers/aws/awsClient"
 )
 
 // S3BucketReconciler reconciles a S3Bucket object
 type S3BucketReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	Log    logr.Logger
-	awsClient *awsClient
+	Scheme    *runtime.Scheme
+	Log       logr.Logger
+	awsClient awsClient.AwsClient
 }
+
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets/finalizers,verbs=update
@@ -52,12 +54,19 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	logger := log.FromContext(ctx)
 	var s3Bucket s3operatorv1.S3Bucket
 	if err := r.Get(context.Background(), req.NamespacedName, &s3Bucket); err != nil {
-		logger.Error(err,"error with geting s3 bucket")
+		logger.Error(err, "error with geting s3 bucket")
 		return ctrl.Result{}, nil
 	}
+	logger.Info("bucket spec", "bucketSpec", s3Bucket.Spec)
+	if !s3Bucket.Status.IsCreated {
+		res,_ := r.awsClient.HandleBucketCreation(&s3Bucket.Spec,&logger)
+			s3Bucket.Status.IsCreated = res
+			r.Status().Update(context.Background(), &s3Bucket)
+		}
+	
+	if s3Bucket.GetDeletionTimestamp() != nil{//checking if resource was deleted
+		r.awsClient.HandleBucketDeletion(&s3Bucket.Spec,&logger)
 
-	if !s3Bucket.Status.IsCreated{
-		awsClient.creatBucket(awsClient.CreateBucketInput)
 	}
 
 	return ctrl.Result{Requeue: true}, nil
