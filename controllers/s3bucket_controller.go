@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // S3BucketReconciler reconciles a S3Bucket object
@@ -51,21 +50,20 @@ type S3BucketReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
 	var s3Bucket s3operatorv1.S3Bucket
-	if err := r.Get(context.Background(), req.NamespacedName, &s3Bucket); err != nil {
-		logger.Error(err, "error with geting s3 bucket")
+	if err := r.Get(context.TODO(), req.NamespacedName, &s3Bucket); err != nil {
+		r.Log.Error(err, "error with geting s3 bucket")
 		return ctrl.Result{}, nil
 	}
-	logger.Info("bucket spec", "bucketSpec", s3Bucket.Spec)
+	r.Log.Info("bucket spec", "bucketSpec", s3Bucket.Spec)
 	if !s3Bucket.Status.IsCreated {
-		res,_ := r.AwsClient.HandleBucketCreation(&s3Bucket.Spec,&logger)
+		res,_ := r.AwsClient.HandleBucketCreation(&s3Bucket.Spec)
 			s3Bucket.Status.IsCreated = res
 			r.Status().Update(context.Background(), &s3Bucket)
 		}
 	
 	if s3Bucket.GetDeletionTimestamp() != nil{//checking if resource was deleted
-		r.AwsClient.HandleBucketDeletion(&s3Bucket.Spec,&logger)
+		r.AwsClient.HandleBucketDeletion(&s3Bucket.Spec)
 	}
 
 	return ctrl.Result{Requeue: true}, nil

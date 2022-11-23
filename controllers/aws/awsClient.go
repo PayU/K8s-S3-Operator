@@ -34,47 +34,61 @@ func (a *AwsClient) BucketExists(name string) (bool, error) {
 	return true, nil
 }
 
-func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, logger *logr.Logger) (bool, error) {
+func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec) (bool, error) {
+	a.Log.Info("HandleBucketCreation")
 	bucketInput := a.CreateBucketInput(bucketSpec.BucketName, bucketSpec.Region)
-	logger.Info("bucketInput", "bucketInput", bucketInput)
-	res, err := a.CreateBucket(*bucketInput, logger)
+	res, err := a.CreateBucket(*bucketInput)
 	if err != nil {
-		logger.Error(err, "got error in create bucket function")
+		a.Log.Error(err, "got error in create bucket function")
 		return false, err
 	}
-	logger.Info("succeded to create new bucket", "createBucketOutput", res)
+	// todo: insert bucket policy
+	if bucketSpec.Encryption{
+		sucEncrypt, err := a.PutBucketEncrypt(bucketSpec.BucketName)
+		// todo: think about deleteing bucket when not succsed to encrypt
+		if err != nil {
+			a.Log.Error(err, "error to encrypt")
+			return true ,err
+		}else{
+			if !sucEncrypt{
+				return true, errors.New("didnt succseded to encrypt")
+			}
+		}
+	}
+	a.Log.Info("succeded to create new bucket", "createBucketOutput", res)
 	return true, nil
 
 }
 
-func (a *AwsClient) HandleBucketDeletion(bucketSpec *s3operatorv1.S3BucketSpec, logger *logr.Logger) (bool, error) {
+func (a *AwsClient) HandleBucketDeletion(bucketSpec *s3operatorv1.S3BucketSpec) (bool, error) {
 	res, err := a.DeleteBucket(bucketSpec.BucketName, bucketSpec.Region)
 	if err != nil {
-		logger.Error(err, "err delete bucket")
+		a.Log.Error(err, "err delete bucket")
 		return false, err
 	}
-	logger.Info("succeded to delete bucket", "res", res)
+	a.Log.Info("succeded to delete bucket", "res", res)
 	return true, nil
 }
 
-func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput, logger *logr.Logger) (*s3.CreateBucketOutput, error) {
+func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
+	a.Log.Info("CreateBucket function")
 	res, err := a.s3Client.CreateBucket(&bucketInput)
 	if err != nil { //  cast err to awserr.Error to get the Code and
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case s3.ErrCodeBucketAlreadyExists:
-				logger.Error(aerr, s3.ErrCodeBucketAlreadyExists)
+				a.Log.Error(aerr, s3.ErrCodeBucketAlreadyExists)
 				return nil, aerr
 			case s3.ErrCodeBucketAlreadyOwnedByYou:
-				logger.Error(aerr, s3.ErrCodeBucketAlreadyOwnedByYou)
+				a.Log.Error(aerr, s3.ErrCodeBucketAlreadyOwnedByYou)
 				return nil, aerr
 			default:
-				logger.Error(aerr, aerr.Error())
+				a.Log.Error(aerr, aerr.Error())
 				return nil, aerr
 			}
 		} else {
 			// Message from an error.
-			logger.Error(err, "error in creatBucket function")
+			a.Log.Error(err, "error in creatBucket function")
 			return nil, err
 		}
 	}
@@ -87,6 +101,7 @@ func (a *AwsClient) CreateBucketInput(bucketName string, bucketRegion string) *s
 		Bucket: aws.String(bucketName),
 	}
 	s3Input.CreateBucketConfiguration = &s3.CreateBucketConfiguration{LocationConstraint: aws.String(bucketRegion)}
+	a.Log.Info("bucketInput", "bucketInput", s3Input)
 	return s3Input
 }
 
@@ -108,7 +123,8 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 	return res, err
 
 }
-func (a *AwsClient) PutBucketEncrypt(bucketName string, ses *session.Session) (bool, error) {
+func (a *AwsClient) PutBucketEncrypt(bucketName string) (bool, error) {
+	a.Log.Info("PutBucketEncrypt function")
 	encryptRules := []*s3.ServerSideEncryptionRule{{
 		BucketKeyEnabled:                   aws.Bool(true),
 		ApplyServerSideEncryptionByDefault: &s3.ServerSideEncryptionByDefault{SSEAlgorithm: aws.String("AES256")}},
@@ -123,6 +139,7 @@ func (a *AwsClient) PutBucketEncrypt(bucketName string, ses *session.Session) (b
 	}
 	res, err := a.s3Client.PutBucketEncryption(input)
 	if err != nil {
+		a.Log.Error(err,"not succsede to PutBucketEncrypt")
 		return false, err
 	}
 	a.Log.Info("succeded to encrypt bucket", "res",res)
@@ -139,6 +156,8 @@ func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolic
 	return res, err
 }
 
+
+func(a *AwsClient) getAllBucket
 
 func  CreateSession() *session.Session {
 	ses := session.Must(session.NewSession(&aws.Config{
