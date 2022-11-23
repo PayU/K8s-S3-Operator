@@ -16,6 +16,9 @@ import (
 
 type AwsClient struct {
 	s3Client s3.S3
+	Log       logr.Logger
+
+
 }
 
 var AWS_END_POINT = "http://172.19.0.4:31566"
@@ -31,56 +34,31 @@ func (a *AwsClient) BucketExists(name string) (bool, error) {
 	return true, nil
 }
 
-func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, logger *logr.Logger)(bool,error){
+func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, logger *logr.Logger) (bool, error) {
 	bucketInput := a.CreateBucketInput(bucketSpec.BucketName, bucketSpec.Region)
 	logger.Info("bucketInput", "bucketInput", bucketInput)
 	res, err := a.CreateBucket(*bucketInput, logger)
-		if err != nil {
-			logger.Error(err, "got error in create bucket function")
-			return false, err
-		}
-		logger.Info("succeded to create new bucket", "createBucketOutput", res)
-		return true, nil
+	if err != nil {
+		logger.Error(err, "got error in create bucket function")
+		return false, err
+	}
+	logger.Info("succeded to create new bucket", "createBucketOutput", res)
+	return true, nil
 
 }
 
-func (a *AwsClient) HandleBucketDeletion(bucketSpec *s3operatorv1.S3BucketSpec, logger *logr.Logger)(bool,error){
+func (a *AwsClient) HandleBucketDeletion(bucketSpec *s3operatorv1.S3BucketSpec, logger *logr.Logger) (bool, error) {
 	res, err := a.DeleteBucket(bucketSpec.BucketName, bucketSpec.Region)
-		if err != nil{
-			logger.Error(err,"err delete bucket")
-			return false, err
-		}
-		logger.Info("succeded to delete bucket","res",res)
-		return true,nil
-
-
+	if err != nil {
+		logger.Error(err, "err delete bucket")
+		return false, err
+	}
+	logger.Info("succeded to delete bucket", "res", res)
+	return true, nil
 }
-func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput, logger *logr.Logger) (*s3.CreateBucketOutput, error) {
-	// region := "us-east-1"
-	ses := session.Must(session.NewSession(&aws.Config{
-		Region:                        aws.String(endpoints.UsEast1RegionID),
-		S3ForcePathStyle:              aws.Bool(true),
-		Endpoint:                      aws.String(AWS_END_POINT),
-		CredentialsChainVerboseErrors: aws.Bool(true),
-		DisableSSL:                    aws.Bool(true),
-	},
-	))
 
-	if ses == nil {
-		err := errors.New("ses is nil")
-		logger.Error(err, "error in create new session")
-		return nil, err
-	}
-	logger.Info("session", "ses", *ses)
-	s3Client := s3.New(ses)
-	if s3Client == nil {
-		s3ClientErr := errors.New("Error in create s3 client")
-		logger.Error(s3ClientErr, "didnt succeded to create s3Client")
-		return nil, s3ClientErr
-	} else {
-		logger.Info("s3Client is", "client", *s3Client)
-	}
-	res, err := s3Client.CreateBucket(&bucketInput)
+func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput, logger *logr.Logger) (*s3.CreateBucketOutput, error) {
+	res, err := a.s3Client.CreateBucket(&bucketInput)
 	if err != nil { //  cast err to awserr.Error to get the Code and
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
@@ -118,7 +96,8 @@ func (a *AwsClient) DeleteBucket(bucketName string, bucketRegion string) (*s3.De
 }
 
 func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.PutBucketPolicyOutput, error) {
-	bucketPolicy := "{'Version': '2012-10-17','Statement': [{ 'Sid': 'id-1','Effect': 'Allow','Principal': {'AWS': 'arn:aws:iam::123456789012:root'}, 'Action': [ 's3:PutObject','s3:PutObjectAcl'], 'Resource': ['arn:aws:s3:::acl3/*' ] } ]}"
+
+	bucketPolicy := `{'Version':${} ,'Statement': [{ 'Sid': 'id-1','Effect': 'Allow','Principal': {'AWS': 'arn:aws:iam::123456789012:root'}, 'Action': [ 's3:PutObject','s3:PutObjectAcl'], 'Resource': ['arn:aws:s3:::acl3/*' ] } ]}`
 
 	input := &s3.PutBucketPolicyInput{
 		Bucket: &bucketName,
@@ -129,6 +108,27 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 	return res, err
 
 }
+func (a *AwsClient) PutBucketEncrypt(bucketName string, ses *session.Session) (bool, error) {
+	encryptRules := []*s3.ServerSideEncryptionRule{{
+		BucketKeyEnabled:                   aws.Bool(true),
+		ApplyServerSideEncryptionByDefault: &s3.ServerSideEncryptionByDefault{SSEAlgorithm: aws.String("AES256")}},
+	}
+	sSEncryptConfiguration := s3.ServerSideEncryptionConfiguration{
+		Rules: encryptRules,
+	}
+
+	input := &s3.PutBucketEncryptionInput{
+		Bucket:                            &bucketName,
+		ServerSideEncryptionConfiguration: &sSEncryptConfiguration,
+	}
+	res, err := a.s3Client.PutBucketEncryption(input)
+	if err != nil {
+		return false, err
+	}
+	a.Log.Info("succeded to encrypt bucket", "res",res)
+	return true, nil
+
+}
 
 func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolicyOutput, error) {
 
@@ -137,4 +137,45 @@ func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolic
 	}
 	res, err := a.s3Client.DeleteBucketPolicy(input)
 	return res, err
+}
+
+
+func  CreateSession() *session.Session {
+	ses := session.Must(session.NewSession(&aws.Config{
+		Region:                        aws.String(endpoints.UsEast1RegionID),
+		S3ForcePathStyle:              aws.Bool(true),
+		Endpoint:                      aws.String(AWS_END_POINT),
+		CredentialsChainVerboseErrors: aws.Bool(true),
+		DisableSSL:                    aws.Bool(true),
+	},
+	))
+	return ses
+}
+
+
+
+func setS3Client(Log *logr.Logger)s3.S3 {
+	ses := CreateSession()
+	if ses == nil {
+		err := errors.New("ses is nil")
+		Log.Error(err, "error in create new session")
+	}
+	Log.Info("session", "ses", *ses)
+	s3Client := s3.New(ses)
+	if s3Client == nil {
+		s3ClientErr := errors.New("Error in create s3 client")
+		Log.Error(s3ClientErr, "didnt succeded to create s3Client")
+		
+	} else {
+		Log.Info(" succeded create s3Client", "client", *s3Client)
+	}
+	return *s3Client
+}
+
+func GetAwsClient(logger *logr.Logger )*AwsClient {
+	return &AwsClient{
+		s3Client: setS3Client(logger),
+		Log: *logger,
+	}
+	
 }

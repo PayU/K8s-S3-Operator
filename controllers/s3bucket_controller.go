@@ -34,7 +34,7 @@ type S3BucketReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
 	Log       logr.Logger
-	awsClient awsClient.AwsClient
+	AwsClient awsClient.AwsClient
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
@@ -59,14 +59,13 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 	logger.Info("bucket spec", "bucketSpec", s3Bucket.Spec)
 	if !s3Bucket.Status.IsCreated {
-		res,_ := r.awsClient.HandleBucketCreation(&s3Bucket.Spec,&logger)
+		res,_ := r.AwsClient.HandleBucketCreation(&s3Bucket.Spec,&logger)
 			s3Bucket.Status.IsCreated = res
 			r.Status().Update(context.Background(), &s3Bucket)
 		}
 	
 	if s3Bucket.GetDeletionTimestamp() != nil{//checking if resource was deleted
-		r.awsClient.HandleBucketDeletion(&s3Bucket.Spec,&logger)
-
+		r.AwsClient.HandleBucketDeletion(&s3Bucket.Spec,&logger)
 	}
 
 	return ctrl.Result{Requeue: true}, nil
