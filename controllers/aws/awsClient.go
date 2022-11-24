@@ -16,9 +16,8 @@ import (
 
 type AwsClient struct {
 	s3Client s3.S3
-	Log       logr.Logger
-
-
+	Log      logr.Logger
+	rMap     ResourceMap
 }
 
 var AWS_END_POINT = "http://172.19.0.4:31566"
@@ -34,8 +33,14 @@ func (a *AwsClient) BucketExists(name string) (bool, error) {
 	return true, nil
 }
 
-func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec) (bool, error) {
+func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec,resourceName string) (bool, error) {
 	a.Log.Info("HandleBucketCreation")
+
+	BucketExist, err := a.BucketExists(bucketSpec.BucketName)
+	if BucketExist {
+		a.Log.Error(err, "bucket allredy exsist")
+		return false, errors.New("bucket allredy exsist")
+	}
 	bucketInput := a.CreateBucketInput(bucketSpec.BucketName, bucketSpec.Region)
 	res, err := a.CreateBucket(*bucketInput)
 	if err != nil {
@@ -43,30 +48,35 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec) 
 		return false, err
 	}
 	// todo: insert bucket policy
-	if bucketSpec.Encryption{
+	if bucketSpec.Encryption {
 		sucEncrypt, err := a.PutBucketEncrypt(bucketSpec.BucketName)
 		// todo: think about deleteing bucket when not succsed to encrypt
 		if err != nil {
 			a.Log.Error(err, "error to encrypt")
-			return true ,err
-		}else{
-			if !sucEncrypt{
+			return true, err
+		} else {
+			if !sucEncrypt {
 				return true, errors.New("didnt succseded to encrypt")
 			}
 		}
 	}
+	a.rMap.AddResource(resourceName,bucketSpec.BucketName)
 	a.Log.Info("succeded to create new bucket", "createBucketOutput", res)
+	a.getAllBucket()
 	return true, nil
 
 }
 
-func (a *AwsClient) HandleBucketDeletion(bucketSpec *s3operatorv1.S3BucketSpec) (bool, error) {
-	res, err := a.DeleteBucket(bucketSpec.BucketName, bucketSpec.Region)
+func (a *AwsClient) HandleBucketDeletion(resourceName string) (bool, error) {
+	bucketName := a.rMap.GetBucketNameForResource(resourceName)
+	a.Log.Info("bucket name in HandleBucketDeletion is "+bucketName)
+	res, err := a.DeleteBucket(bucketName)
 	if err != nil {
 		a.Log.Error(err, "err delete bucket")
 		return false, err
 	}
 	a.Log.Info("succeded to delete bucket", "res", res)
+	a.rMap.RemoveResource(resourceName)
 	return true, nil
 }
 
@@ -92,6 +102,7 @@ func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBu
 			return nil, err
 		}
 	}
+	a.Log.Info("result from bucket creation", "result", res)
 	return res, nil
 
 }
@@ -105,7 +116,7 @@ func (a *AwsClient) CreateBucketInput(bucketName string, bucketRegion string) *s
 	return s3Input
 }
 
-func (a *AwsClient) DeleteBucket(bucketName string, bucketRegion string) (*s3.DeleteBucketOutput, error) {
+func (a *AwsClient) DeleteBucket(bucketName string) (*s3.DeleteBucketOutput, error) {
 	res, err := a.s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
 	return res, err
 }
@@ -139,10 +150,10 @@ func (a *AwsClient) PutBucketEncrypt(bucketName string) (bool, error) {
 	}
 	res, err := a.s3Client.PutBucketEncryption(input)
 	if err != nil {
-		a.Log.Error(err,"not succsede to PutBucketEncrypt")
+		a.Log.Error(err, "not succsede to PutBucketEncrypt")
 		return false, err
 	}
-	a.Log.Info("succeded to encrypt bucket", "res",res)
+	a.Log.Info("succeded to encrypt bucket", "res", res)
 	return true, nil
 
 }
@@ -156,10 +167,16 @@ func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolic
 	return res, err
 }
 
+func (a *AwsClient) getAllBucket() {
+	buckets, err := a.s3Client.ListBuckets(&s3.ListBucketsInput{})
+	if err != nil {
+		a.Log.Error(err, "not succeded to get buckets")
+	} else {
+		a.Log.Info("ALL BUCKETS", "buckets", buckets)
+	}
+}
 
-func(a *AwsClient) getAllBucket
-
-func  CreateSession() *session.Session {
+func CreateSession() *session.Session {
 	ses := session.Must(session.NewSession(&aws.Config{
 		Region:                        aws.String(endpoints.UsEast1RegionID),
 		S3ForcePathStyle:              aws.Bool(true),
@@ -171,9 +188,7 @@ func  CreateSession() *session.Session {
 	return ses
 }
 
-
-
-func setS3Client(Log *logr.Logger)s3.S3 {
+func setS3Client(Log *logr.Logger) s3.S3 {
 	ses := CreateSession()
 	if ses == nil {
 		err := errors.New("ses is nil")
@@ -184,17 +199,18 @@ func setS3Client(Log *logr.Logger)s3.S3 {
 	if s3Client == nil {
 		s3ClientErr := errors.New("Error in create s3 client")
 		Log.Error(s3ClientErr, "didnt succeded to create s3Client")
-		
+
 	} else {
 		Log.Info(" succeded create s3Client", "client", *s3Client)
 	}
 	return *s3Client
 }
 
-func GetAwsClient(logger *logr.Logger )*AwsClient {
+func GetAwsClient(logger *logr.Logger) *AwsClient {
 	return &AwsClient{
 		s3Client: setS3Client(logger),
-		Log: *logger,
+		Log:      *logger,
+		rMap: ResourceMap{},
 	}
-	
+
 }
