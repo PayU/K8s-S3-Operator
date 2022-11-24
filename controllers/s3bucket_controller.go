@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
 )
 
 // S3BucketReconciler reconciles a S3Bucket object
@@ -35,7 +34,6 @@ type S3BucketReconciler struct {
 	Scheme    *runtime.Scheme
 	Log       logr.Logger
 	AwsClient awsClient.AwsClient
-	
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
@@ -56,12 +54,19 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	var s3Bucket s3operatorv1.S3Bucket
 	if err := r.Get(context.TODO(), req.NamespacedName, &s3Bucket); err != nil {
 		r.Log.Error(err, "error with geting s3 bucket")
-		r.AwsClient.HandleBucketDeletion(req.Name)
+		bucketList := &s3operatorv1.S3BucketList{}
+		err := r.List(context.TODO(), bucketList)
+		if err != nil {
+			r.Log.Error(err, "error on list s3 k8s resorces")
+		} else {
+			r.AwsClient.HandleBucketDeletion(bucketList.Items)
+
+		}
 		return ctrl.Result{Requeue: true}, nil
 	}
 	r.Log.Info("bucket spec", "bucketSpec", s3Bucket.Spec)
 	if !s3Bucket.Status.IsCreated {
-		res, _ := r.AwsClient.HandleBucketCreation(&s3Bucket.Spec,req.Name)
+		res, _ := r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, req.Name)
 		s3Bucket.Status.IsCreated = res
 		r.Status().Update(context.Background(), &s3Bucket)
 	}

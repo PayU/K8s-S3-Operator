@@ -11,16 +11,18 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-logr/logr"
 
+	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 type AwsClient struct {
-	s3Client s3.S3
-	Log      logr.Logger
-	rMap     ResourceMap
+	s3Client   s3.S3
+	RGTAClient resourcegroupstaggingapi.ResourceGroupsTaggingAPI
+	Log        logr.Logger
 }
 
 var AWS_END_POINT = "http://172.19.0.4:31566"
+var DEFAULT_TAG = &s3.Tag{Key: aws.String("createdBy"), Value: aws.String("s3Operator")}
 
 func (a *AwsClient) BucketExists(name string) (bool, error) {
 	_, err := a.s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(name)})
@@ -33,7 +35,7 @@ func (a *AwsClient) BucketExists(name string) (bool, error) {
 	return true, nil
 }
 
-func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec,resourceName string) (bool, error) {
+func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, resourceName string) (bool, error) {
 	a.Log.Info("HandleBucketCreation")
 
 	BucketExist, err := a.BucketExists(bucketSpec.BucketName)
@@ -47,36 +49,33 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec,r
 		a.Log.Error(err, "got error in create bucket function")
 		return false, err
 	}
+	a.PutBucketTagging(bucketSpec.BucketName, &bucketSpec.Tags)
+
 	// todo: insert bucket policy
 	if bucketSpec.Encryption {
-		sucEncrypt, err := a.PutBucketEncrypt(bucketSpec.BucketName)
-		// todo: think about deleteing bucket when not succsed to encrypt
-		if err != nil {
-			a.Log.Error(err, "error to encrypt")
-			return true, err
-		} else {
-			if !sucEncrypt {
-				return true, errors.New("didnt succseded to encrypt")
-			}
-		}
+		a.PutBucketEncrypt(bucketSpec.BucketName)
 	}
-	a.rMap.AddResource(resourceName,bucketSpec.BucketName)
 	a.Log.Info("succeded to create new bucket", "createBucketOutput", res)
-	a.getAllBucket()
 	return true, nil
 
 }
 
-func (a *AwsClient) HandleBucketDeletion(resourceName string) (bool, error) {
-	bucketName := a.rMap.GetBucketNameForResource(resourceName)
-	a.Log.Info("bucket name in HandleBucketDeletion is "+bucketName)
-	res, err := a.DeleteBucket(bucketName)
-	if err != nil {
-		a.Log.Error(err, "err delete bucket")
-		return false, err
+func (a *AwsClient) HandleBucketDeletion(bucketsK8S []s3operatorv1.S3Bucket) (bool, error) {
+	bukcetsFromAws := a.getAllBucketsByTag(DEFAULT_TAG)
+	mapResourceK8s := make(map[string]struct{}, len(bucketsK8S))
+	for _, b := range bucketsK8S {
+		mapResourceK8s[b.Spec.BucketName] = struct{}{}
 	}
-	a.Log.Info("succeded to delete bucket", "res", res)
-	a.rMap.RemoveResource(resourceName)
+	for _, bucketName := range bukcetsFromAws {
+		if _, found := mapResourceK8s[*bucketName]; !found {
+			res, err := a.DeleteBucket(*bucketName)
+			if err != nil {
+				a.Log.Error(err, "err delete bucket"+*bucketName)
+				return false, err
+			}
+			a.Log.Info("succeded to delete bucket", "res", res)
+		}
+	}
 	return true, nil
 }
 
@@ -105,6 +104,30 @@ func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBu
 	a.Log.Info("result from bucket creation", "result", res)
 	return res, nil
 
+}
+
+func (a *AwsClient) PutBucketTagging(bucketName string, bucketTags *map[string]string) (bool, error) {
+	var tags []*s3.Tag
+	for key, val := range *bucketTags {
+		tag := s3.Tag{
+			Key:   &key,
+			Value: &val,
+		}
+		tags = append(tags, &tag)
+	}
+	tags = append(tags, DEFAULT_TAG)
+
+	input := &s3.PutBucketTaggingInput{
+		Bucket:  aws.String(bucketName),
+		Tagging: &s3.Tagging{TagSet: tags},
+	}
+	res, err := a.s3Client.PutBucketTagging(input)
+	if err != nil {
+		a.Log.Error(err, "error PutBucketTagging")
+		return false, err
+	}
+	a.Log.Info("succeded to PutBucketTagging", "res", res)
+	return true, nil
 }
 
 func (a *AwsClient) CreateBucketInput(bucketName string, bucketRegion string) *s3.CreateBucketInput {
@@ -167,13 +190,21 @@ func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolic
 	return res, err
 }
 
-func (a *AwsClient) getAllBucket() {
-	buckets, err := a.s3Client.ListBuckets(&s3.ListBucketsInput{})
-	if err != nil {
-		a.Log.Error(err, "not succeded to get buckets")
-	} else {
-		a.Log.Info("ALL BUCKETS", "buckets", buckets)
+func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) []*string {
+	var buckets []*string
+	input := resourcegroupstaggingapi.GetResourcesInput{
+		ResourceTypeFilters: []*string{aws.String("s3:bucket")},
+		ResourcesPerPage:    aws.Int64(100),
+		TagFilters:          []*resourcegroupstaggingapi.TagFilter{{Key: filterTag.Key, Values: []*string{filterTag.Value}}},
 	}
+	a.RGTAClient.GetResourcesPages(&input,
+		func(page *resourcegroupstaggingapi.GetResourcesOutput, isLastPage bool) bool {
+			for _, b := range page.ResourceTagMappingList {
+				buckets = append(buckets, b.ResourceARN)
+			}
+			return isLastPage
+		})
+	return buckets
 }
 
 func CreateSession() *session.Session {
@@ -194,10 +225,10 @@ func setS3Client(Log *logr.Logger) s3.S3 {
 		err := errors.New("ses is nil")
 		Log.Error(err, "error in create new session")
 	}
-	Log.Info("session", "ses", *ses)
+	Log.Info("session", "ses", ses)
 	s3Client := s3.New(ses)
 	if s3Client == nil {
-		s3ClientErr := errors.New("Error in create s3 client")
+		s3ClientErr := errors.New("error in create s3 client")
 		Log.Error(s3ClientErr, "didnt succeded to create s3Client")
 
 	} else {
@@ -210,7 +241,5 @@ func GetAwsClient(logger *logr.Logger) *AwsClient {
 	return &AwsClient{
 		s3Client: setS3Client(logger),
 		Log:      *logger,
-		rMap: ResourceMap{},
 	}
-
 }
