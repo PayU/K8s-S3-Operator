@@ -1,6 +1,6 @@
 CLUSTER_NAME=s3operator-cluster
-IMG = controller:tilt
-NAMESPACE = k8s-s3-operator-system
+IMG=controller:tilt
+NAMESPACE=k8s-s3-operator-system
 
 
 make create-local-cluster
