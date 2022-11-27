@@ -189,8 +189,6 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 
 	}
 
-	// bucketPolicy := `{'Version':${} ,'Statement': [{ 'Sid': 'id-1','Effect': 'Allow','Principal': {'AWS': 'arn:aws:iam::123456789012:root'}, 'Action': [ 's3:PutObject','s3:PutObjectAcl'], 'Resource': ['arn:aws:s3:::acl3/*' ] } ]}`
-
 	input := &s3.PutBucketPolicyInput{
 		Bucket: &bucketName,
 		Policy: aws.String(string(bucketPolicy)),
