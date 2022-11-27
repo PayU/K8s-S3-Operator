@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-logr/logr"
 
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
@@ -20,6 +22,7 @@ type AwsClient struct {
 	s3Client   s3.S3
 	RGTAClient resourcegroupstaggingapi.ResourceGroupsTaggingAPI
 	Log        logr.Logger
+	iamClient  IamClient
 }
 
 var AWS_END_POINT = "http://172.19.0.4:31566"
@@ -51,8 +54,10 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, 
 		return false, err
 	}
 	a.PutBucketTagging(bucketSpec.BucketName, &bucketSpec.Tags)
+	roleName := getRoleName(bucketSpec.BucketName)
+	a.iamClient.CreateIamRole(roleName, &iam.Tag{Key: DEFAULT_TAG.Key, Value: DEFAULT_TAG.Value})
 
-	// todo: insert bucket policy
+	a.PutBucketPolicy(bucketSpec.BucketName, roleName)
 	if bucketSpec.Encryption {
 		a.PutBucketEncrypt(bucketSpec.BucketName)
 	}
@@ -63,7 +68,7 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, 
 
 func (a *AwsClient) HandleBucketDeletion(bucketsK8S []s3operatorv1.S3Bucket) (bool, error) {
 	a.Log.Info("HandleBucketDeletion function")
-	bukcetsFromAws, err:= a.getAllBucketsByTag(DEFAULT_TAG)
+	bukcetsFromAws, err := a.getAllBucketsByTag(DEFAULT_TAG)
 	if err != nil {
 		a.Log.Error(err, "error in HandleBucketDeletion in getAllBucketsByTag")
 		return false, err
@@ -79,6 +84,8 @@ func (a *AwsClient) HandleBucketDeletion(bucketsK8S []s3operatorv1.S3Bucket) (bo
 				a.Log.Error(err, "err delete bucket"+*bucketName)
 				return false, err
 			}
+			a.DeleteBucketPolicy(*bucketName)
+			a.iamClient.DeleteIamRole(getRoleName(*bucketName))
 			a.Log.Info("succeded to delete bucket", "res", res)
 		}
 	}
@@ -152,12 +159,41 @@ func (a *AwsClient) DeleteBucket(bucketName string) (*s3.DeleteBucketOutput, err
 }
 
 func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.PutBucketPolicyOutput, error) {
+	a.Log.Info("PutBucketPolicy fuction")
 
-	bucketPolicy := `{'Version':${} ,'Statement': [{ 'Sid': 'id-1','Effect': 'Allow','Principal': {'AWS': 'arn:aws:iam::123456789012:root'}, 'Action': [ 's3:PutObject','s3:PutObjectAcl'], 'Resource': ['arn:aws:s3:::acl3/*' ] } ]}`
+	// Create a policy using map interface. Filling in the bucket as the
+	// resource.
+	AllPremisionToRole := map[string]interface{}{
+		"Version": "2012-10-17",
+		"Statement": []map[string]interface{}{
+			{
+				"Sid":    "AllPremisionToRole",
+				"Effect": "Allow",
+				"Principal": []string{
+					"AWS: arn:aws:iam:::role/" + roleName,
+				},
+				"Action": []string{
+					"s3:*",
+				},
+				"Resource": []string{
+					"arn:aws:s3:::" + bucketName,
+					"arn:aws:s3:::" + bucketName + "/*",
+				},
+			},
+		},
+	}
+	bucketPolicy, err := json.Marshal(AllPremisionToRole)
+	if err != nil {
+		a.Log.Error(err, "error in PutBucketPolicy in Marshal")
+		return nil, err
+
+	}
+
+	// bucketPolicy := `{'Version':${} ,'Statement': [{ 'Sid': 'id-1','Effect': 'Allow','Principal': {'AWS': 'arn:aws:iam::123456789012:root'}, 'Action': [ 's3:PutObject','s3:PutObjectAcl'], 'Resource': ['arn:aws:s3:::acl3/*' ] } ]}`
 
 	input := &s3.PutBucketPolicyInput{
 		Bucket: &bucketName,
-		Policy: &bucketPolicy,
+		Policy: aws.String(string(bucketPolicy)),
 	}
 
 	res, err := a.s3Client.PutBucketPolicy(input)
@@ -189,15 +225,18 @@ func (a *AwsClient) PutBucketEncrypt(bucketName string) (bool, error) {
 }
 
 func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolicyOutput, error) {
-
+	a.Log.Info("DeleteBucketPolicy function")
 	input := &s3.DeleteBucketPolicyInput{
 		Bucket: &bucketName,
 	}
 	res, err := a.s3Client.DeleteBucketPolicy(input)
+	if err != nil {
+		a.Log.Error(err, "error in DeleteBucketPolicy")
+	}
 	return res, err
 }
 
-func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) ([]*string,error) {
+func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) ([]*string, error) {
 	a.Log.Info("getAllBucketsByTag function", "filterTag", filterTag)
 	var buckets []*string
 
@@ -219,6 +258,11 @@ func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) ([]*string,error) {
 		return nil, err
 	}
 	return buckets, nil
+}
+
+func getRoleName(bucketName string) string {
+	roleName := bucketName + "IAM-ROLE-S3Operator"
+	return roleName
 }
 
 func CreateSession() *session.Session {
@@ -254,23 +298,25 @@ func setRGTAClient(Log *logr.Logger, ses *session.Session) resourcegroupstagging
 	}
 	return *RGTAClient
 }
-func setClients(Log *logr.Logger) (s3.S3, resourcegroupstaggingapi.ResourceGroupsTaggingAPI) {
+
+func setClients(Log *logr.Logger) (s3.S3, resourcegroupstaggingapi.ResourceGroupsTaggingAPI, iam.IAM) {
 	ses := CreateSession()
 	if ses == nil {
 		err := errors.New("ses is nil")
 		Log.Error(err, "error in create new session")
 	} else {
 		Log.Info("session", "ses", ses)
-		return setS3Client(Log, ses), setRGTAClient(Log, ses)
+		return setS3Client(Log, ses), setRGTAClient(Log, ses), setIamClient(Log, ses)
 	}
-	return s3.S3{}, resourcegroupstaggingapi.ResourceGroupsTaggingAPI{}
+	return s3.S3{}, resourcegroupstaggingapi.ResourceGroupsTaggingAPI{}, iam.IAM{}
 }
 
 func GetAwsClient(logger *logr.Logger) *AwsClient {
-	s3Client, rgtaClient := setClients(logger)
+	s3Client, rgtaClient, iamClient := setClients(logger)
 	return &AwsClient{
 		s3Client:   s3Client,
 		Log:        *logger,
 		RGTAClient: rgtaClient,
+		iamClient:  IamClient{IamClient: iamClient, Log: *logger},
 	}
 }

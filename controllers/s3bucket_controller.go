@@ -56,19 +56,14 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		r.Log.Error(err, "error with geting s3 bucket")
 		bucketList := &s3operatorv1.S3BucketList{}
 		err := r.List(context.TODO(), bucketList)
-		r.Log.Info("llllllliiiiiissssstttttt")
 		if err != nil {
-			r.Log.Info("222222222")
 			r.Log.Error(err, "error on list s3 k8s resorces")
 		} else {
-			r.Log.Info("1111111111","list",bucketList.Items)
-
 			r.AwsClient.HandleBucketDeletion(bucketList.Items)
 
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
-	r.Log.Info("bucket spec", "bucketSpec", s3Bucket.Spec)
 	if !s3Bucket.Status.IsCreated {
 		res, _ := r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, req.Name)
 		s3Bucket.Status.IsCreated = res
