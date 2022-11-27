@@ -1,5 +1,7 @@
 CLUSTER_NAME=s3operator-cluster
 IMG = controller:tilt
+NAMESPACE = k8s-s3-operator-system
+
 
 make create-local-cluster
 current_context=$(kubectl config current-context)
@@ -8,10 +10,11 @@ if [ "$current_context" = "kind-$CLUSTER_NAME" ]; then
     make docker-build
     echo "load image to kind"
     make kind-load-controller
-    echo "run local aws loacalstack on docker"
-    make run-local-aws-on-cluster
     echo "deploy operator"
     make deploy
+    
+    echo "run local aws loacalstack on docker"
+    make run-local-aws-on-cluster
 else
   echo "Please set the current cluster context to kind-$CLUSTER_NAME and re-run the install script"
 fi

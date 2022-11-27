@@ -2,6 +2,7 @@ package aws
 
 import (
 	"errors"
+	"strings"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 
@@ -62,7 +63,11 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, 
 
 func (a *AwsClient) HandleBucketDeletion(bucketsK8S []s3operatorv1.S3Bucket) (bool, error) {
 	a.Log.Info("HandleBucketDeletion function")
-	bukcetsFromAws := a.getAllBucketsByTag(DEFAULT_TAG)
+	bukcetsFromAws, err:= a.getAllBucketsByTag(DEFAULT_TAG)
+	if err != nil {
+		a.Log.Error(err, "error in HandleBucketDeletion in getAllBucketsByTag")
+		return false, err
+	}
 	mapResourceK8s := make(map[string]struct{}, len(bucketsK8S))
 	for _, b := range bucketsK8S {
 		mapResourceK8s[b.Spec.BucketName] = struct{}{}
@@ -127,7 +132,7 @@ func (a *AwsClient) PutBucketTagging(bucketName string, bucketTags *map[string]s
 		a.Log.Error(err, "error PutBucketTagging")
 		return false, err
 	}
-	a.Log.Info("succeded to PutBucketTagging", "res", res)
+	a.Log.Info("succeded to PutBucketTagging", "res", res, "input", input)
 	return true, nil
 }
 
@@ -192,25 +197,28 @@ func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolic
 	return res, err
 }
 
-func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) []*string {
-	a.Log.Info("getAllBucketsByTag function")
+func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) ([]*string,error) {
+	a.Log.Info("getAllBucketsByTag function", "filterTag", filterTag)
 	var buckets []*string
+
 	input := resourcegroupstaggingapi.GetResourcesInput{
-		ResourceTypeFilters: []*string{aws.String("s3:bucket")},
-		ResourcesPerPage:    aws.Int64(100),
-		TagFilters:          []*resourcegroupstaggingapi.TagFilter{{Key: filterTag.Key, Values: []*string{filterTag.Value}}},
+		ResourceARNList:  []*string{aws.String("arn:aws:s3")},
+		ResourcesPerPage: aws.Int64(100),
+		TagFilters:       []*resourcegroupstaggingapi.TagFilter{{Key: filterTag.Key, Values: []*string{filterTag.Value}}},
 	}
 	err := a.RGTAClient.GetResourcesPages(&input,
 		func(page *resourcegroupstaggingapi.GetResourcesOutput, isLastPage bool) bool {
 			for _, b := range page.ResourceTagMappingList {
-				buckets = append(buckets, b.ResourceARN)
+				bucketSplitArrayARN := strings.Split(*b.ResourceARN, ":")
+				buckets = append(buckets, &bucketSplitArrayARN[len(bucketSplitArrayARN)-1])
 			}
 			return isLastPage
 		})
 	if err != nil {
 		a.Log.Error(err, "error in GetResourcesPages")
+		return nil, err
 	}
-	return buckets
+	return buckets, nil
 }
 
 func CreateSession() *session.Session {
