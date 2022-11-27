@@ -1,24 +1,25 @@
-if k8s_context() != 'kind-s3operator-cluster':
-  fail('Expected K8s context to be "kind-s3operator-cluster", found: ' + k8s_context())
+IMG = 'controller:tilt'
+docker_build(IMG, '.')
 
-compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/manager main.go'
+def yaml():
+    return local('cd config/manager; kustomize edit set image controller=' + IMG + '; cd ../..; kustomize build config/default')
 
-local_resource(
-  's3-operator-compile',
-  compile_cmd,
-  deps=['./main.go', './api', './controllers']
-)
+def manifests():
+    return 'bin/controller-gen crd:trivialVersions=true rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases;'
 
+def generate():
+    return 'bin/controller-gen object:headerFile="hack/boilerplate.go.txt" paths="./...";'
 
-docker_build('controller', '.', 
-    dockerfile='./Dockerfile')
-k8s_yaml('./config/crd/bases/s3operator.payu.com_s3buckets.yaml')
-k8s_yaml('./config/manager/manager.yaml')
-k8s_resource(
-  new_name='s3-bucket-crd',
-  objects=['s3buckets.s3operator.payu.com:CustomResourceDefinition:default'],
-)
-k8s_resource('controller-manager', port_forwards=[
-    port_forward(8080, 8080, "api-server"),
-],
-)
+def vetfmt():
+    return 'go vet ./...; go fmt ./...'
+
+def binary():
+    return 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/manager main.go'
+
+local(manifests() + generate())
+
+local_resource('crd', manifests() + 'kustomize build config/crd | kubectl apply -f -', deps=["api"])
+
+k8s_yaml(yaml())
+
+local_resource('recompile', generate() + binary(), deps=['controllers', 'main.go'])
