@@ -7,9 +7,9 @@ metadata:
     app.kubernetes.io/part-of: k8s-s3-operator
     app.kuberentes.io/managed-by: kustomize
     app.kubernetes.io/created-by: k8s-s3-operator
-  name: s3bucket-sample1
+  name: s3bucket-sample2
   namespace: k8s-s3-operator-system
 spec:
   encryption: true
-  bucketName: nivbucket333
+  bucketName: nivbucket111
   region: us-east-1

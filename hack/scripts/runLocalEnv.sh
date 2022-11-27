@@ -1,5 +1,5 @@
 CLUSTER_NAME=s3operator-cluster
-IMG = controller:local
+IMG = controller:tilt
 
 make create-local-cluster
 current_context=$(kubectl config current-context)
@@ -9,7 +9,7 @@ if [ "$current_context" = "kind-$CLUSTER_NAME" ]; then
     echo "load image to kind"
     make kind-load-controller
     echo "run local aws loacalstack on docker"
-    make run-local-aws
+    make run-local-aws-on-cluster
     echo "deploy operator"
     make deploy
 else

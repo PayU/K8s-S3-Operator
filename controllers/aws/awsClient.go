@@ -61,6 +61,7 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, 
 }
 
 func (a *AwsClient) HandleBucketDeletion(bucketsK8S []s3operatorv1.S3Bucket) (bool, error) {
+	a.Log.Info("HandleBucketDeletion function")
 	bukcetsFromAws := a.getAllBucketsByTag(DEFAULT_TAG)
 	mapResourceK8s := make(map[string]struct{}, len(bucketsK8S))
 	for _, b := range bucketsK8S {
@@ -140,6 +141,7 @@ func (a *AwsClient) CreateBucketInput(bucketName string, bucketRegion string) *s
 }
 
 func (a *AwsClient) DeleteBucket(bucketName string) (*s3.DeleteBucketOutput, error) {
+	a.Log.Info("DeleteBucket function")
 	res, err := a.s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
 	return res, err
 }
@@ -191,19 +193,23 @@ func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolic
 }
 
 func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) []*string {
+	a.Log.Info("getAllBucketsByTag function")
 	var buckets []*string
 	input := resourcegroupstaggingapi.GetResourcesInput{
 		ResourceTypeFilters: []*string{aws.String("s3:bucket")},
 		ResourcesPerPage:    aws.Int64(100),
 		TagFilters:          []*resourcegroupstaggingapi.TagFilter{{Key: filterTag.Key, Values: []*string{filterTag.Value}}},
 	}
-	a.RGTAClient.GetResourcesPages(&input,
+	err := a.RGTAClient.GetResourcesPages(&input,
 		func(page *resourcegroupstaggingapi.GetResourcesOutput, isLastPage bool) bool {
 			for _, b := range page.ResourceTagMappingList {
 				buckets = append(buckets, b.ResourceARN)
 			}
 			return isLastPage
 		})
+	if err != nil {
+		a.Log.Error(err, "error in GetResourcesPages")
+	}
 	return buckets
 }
 
@@ -219,27 +225,44 @@ func CreateSession() *session.Session {
 	return ses
 }
 
-func setS3Client(Log *logr.Logger) s3.S3 {
-	ses := CreateSession()
-	if ses == nil {
-		err := errors.New("ses is nil")
-		Log.Error(err, "error in create new session")
-	}
-	Log.Info("session", "ses", ses)
+func setS3Client(Log *logr.Logger, ses *session.Session) s3.S3 {
 	s3Client := s3.New(ses)
 	if s3Client == nil {
 		s3ClientErr := errors.New("error in create s3 client")
 		Log.Error(s3ClientErr, "didnt succeded to create s3Client")
-
 	} else {
 		Log.Info(" succeded create s3Client", "client", *s3Client)
 	}
 	return *s3Client
 }
 
+func setRGTAClient(Log *logr.Logger, ses *session.Session) resourcegroupstaggingapi.ResourceGroupsTaggingAPI {
+	RGTAClient := resourcegroupstaggingapi.New(ses)
+	if RGTAClient == nil {
+		RGTAClientErr := errors.New("error in create RGTAClient")
+		Log.Error(RGTAClientErr, "didnt succeded to create s3Client")
+	} else {
+		Log.Info(" succeded create RGTAClient", "client", *RGTAClient)
+	}
+	return *RGTAClient
+}
+func setClients(Log *logr.Logger) (s3.S3, resourcegroupstaggingapi.ResourceGroupsTaggingAPI) {
+	ses := CreateSession()
+	if ses == nil {
+		err := errors.New("ses is nil")
+		Log.Error(err, "error in create new session")
+	} else {
+		Log.Info("session", "ses", ses)
+		return setS3Client(Log, ses), setRGTAClient(Log, ses)
+	}
+	return s3.S3{}, resourcegroupstaggingapi.ResourceGroupsTaggingAPI{}
+}
+
 func GetAwsClient(logger *logr.Logger) *AwsClient {
+	s3Client, rgtaClient := setClients(logger)
 	return &AwsClient{
-		s3Client: setS3Client(logger),
-		Log:      *logger,
+		s3Client:   s3Client,
+		Log:        *logger,
+		RGTAClient: rgtaClient,
 	}
 }
