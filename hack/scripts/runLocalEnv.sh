@@ -1,5 +1,5 @@
 CLUSTER_NAME=s3operator-cluster
-IMG ?= controller:tilt
+IMG = controller:tilt
 NAMESPACE = k8s-s3-operator-system
 
 
