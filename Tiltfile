@@ -16,8 +16,6 @@ def vetfmt():
 def binary():
     return 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/manager main.go'
 
-local(manifests() + generate())
-
 local_resource('crd', manifests() + 'kustomize build config/crd | kubectl apply -f -', deps=["api"])
 
 k8s_yaml(yaml())
