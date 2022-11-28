@@ -13,7 +13,7 @@ if [ "$current_context" = "kind-$CLUSTER_NAME" ]; then
     echo "deploy operator"
     make deploy
     
-    echo "run local aws loacalstack on docker"
+    echo "run local aws loacalstack on cluster"
     make run-local-aws-on-cluster
 else
   echo "Please set the current cluster context to kind-$CLUSTER_NAME and re-run the install script"
