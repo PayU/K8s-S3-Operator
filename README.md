@@ -15,6 +15,7 @@ Requirements:
 
 **Quick Start**
 
+This script will create kind cluster, build image and deploy it and will run local aws on cluster ([localstack](https://github.com/localstack/localstack))
 ```bash
 sh ./hack/scripts/runLocalEnv.sh # you might need to run this as sudo if a regular user can't use docker
 
@@ -32,7 +33,11 @@ Setup based on [official docs](https://docs.tilt.dev/example_go.html) can be fou
 Prerequisites:
 
 1. Install the Tilt tool
-2. Run `tilt up` and go the indicated localhost webpage
+2. Run
+```bash
+    sh ./hack/scripts/runLocalEnv.sh
+``` 
+3. Run `tilt up` and go the indicated localhost webpage
 
 ```
 > tilt up

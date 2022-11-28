@@ -3,8 +3,10 @@
 IMG ?= controller:tilt
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.20.
+
 CLUSTER_NAME = s3operator-cluster
 NAMESPACE = k8s-s3-operator-system
+
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))

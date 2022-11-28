@@ -15,33 +15,33 @@ type IamClient struct {
 	Log       logr.Logger
 }
 
-func (c IamClient) CreateIamRole(roleName string,Tag *iam.Tag) (*iam.CreateRoleOutput, error) {
+func (c IamClient) CreateIamRole(roleName string, Tag *iam.Tag) (*iam.CreateRoleOutput, error) {
 	c.Log.Info("CreateIamRole function")
-	policy,err := json.Marshal(map[string]interface{}{
+	policy, err := json.Marshal(map[string]interface{}{
 		"Version": "2012-10-17",
 		"Statement": []map[string]interface{}{
-		  {
-			"Action":[]string{
-			  "s3:*",
+			{
+				"Action": []string{
+					"s3:*",
+				},
+				"Effect":   "Allow",
+				"Resource": "*",
 			},
-			"Effect":"Allow",
-			"Resource":"*",
-		  },
 		},
-	  })
-	if err != nil{
+	})
+	if err != nil {
 		c.Log.Error(err, "error in CreateIamRole in Marshal")
 		return nil, err
 	}
 	input := iam.CreateRoleInput{
-		RoleName: &roleName,
-		Tags: []*iam.Tag{Tag},
+		RoleName:                 &roleName,
+		Tags:                     []*iam.Tag{Tag},
 		AssumeRolePolicyDocument: aws.String(string(policy)),
 	}
 	res, err := c.IamClient.CreateRole(&input)
 	if err != nil {
 		c.Log.Error(err, "error in CreateIamRole in CreateRole")
-	}else{
+	} else {
 		c.Log.Info("succeded to create iam role", "res", res)
 	}
 	return res, err
@@ -55,7 +55,7 @@ func (c IamClient) DeleteIamRole(roleName string) (*iam.DeleteRoleOutput, error)
 	res, err := c.IamClient.DeleteRole(&input)
 	if err != nil {
 		c.Log.Error(err, "error in DeleteIamRole in DeleteRole")
-	}else{
+	} else {
 		c.Log.Info("succeded to delete iam role", "res", res)
 	}
 	return res, err
