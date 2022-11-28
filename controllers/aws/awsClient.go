@@ -40,15 +40,6 @@ func (a *AwsClient) BucketExists(name string) (bool, error) {
 	return true, nil
 }
 func (a *AwsClient) validateBucketName(name string) bool {
-	if len(name) < 3 || len(name) > 63 {
-		return false
-	}
-	if name[0] == '.' || name[len(name)-1] == '.' {
-		return false
-	}
-	if match, _ := regexp.MatchString("\\.\\.", name); !match {
-		return false
-	}
 	if len(name) > 4 && name[:4] == "xn--" {
 		return false
 	}
