@@ -3,6 +3,7 @@ package aws
 import (
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
@@ -38,10 +39,33 @@ func (a *AwsClient) BucketExists(name string) (bool, error) {
 	}
 	return true, nil
 }
+func (a *AwsClient) validateBucketName(name string) bool {
+	if len(name) < 3 || len(name) > 63 {
+		return false
+	}
+	if name[0] == '.' || name[len(name)-1] == '.' {
+		return false
+	}
+	if match, _ := regexp.MatchString("\\.\\.", name); !match {
+		return false
+	}
+	if len(name) > 4 && name[:4] == "xn--" {
+		return false
+	}
+	if len(name) > 8 && name[len(name)-8:] == "-s3alias" {
+		return false
+	}
+	match, _ := regexp.MatchString("^[a-zA-Z][a-zA-Z0-9\\-]+[a-zA-Z0-9]$", name)
+	return match
+}
 
 func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, resourceName string) (bool, error) {
 	a.Log.Info("HandleBucketCreation")
-
+	if !a.validateBucketName(bucketSpec.BucketName) {
+		validateErr := errors.New("error bucket name is unvalid")
+		a.Log.Error(validateErr, "bucket name is unvalid")
+		return false, validateErr
+	}
 	BucketExist, err := a.BucketExists(bucketSpec.BucketName)
 	if BucketExist {
 		a.Log.Error(err, "bucket allredy exsist")
