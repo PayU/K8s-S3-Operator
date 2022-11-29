@@ -11,5 +11,5 @@ metadata:
   namespace: k8s-s3-operator-system
 spec:
   encryption: true
-  bucketName: nivbucket111
+  bucketName: sample-bukcet1
   region: us-east-1

@@ -3,14 +3,15 @@ package aws
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
 	"regexp"
 	"strings"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
+	"github.com/PayU/K8s-S3-Operator/config"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-logr/logr"
 
@@ -20,14 +21,12 @@ import (
 )
 
 type AwsClient struct {
-	s3Client   s3.S3
-	RGTAClient resourcegroupstaggingapi.ResourceGroupsTaggingAPI
-	Log        logr.Logger
-	iamClient  IamClient
+	s3Client   *s3.S3
+	RGTAClient *resourcegroupstaggingapi.ResourceGroupsTaggingAPI
+	Log        *logr.Logger
+	iamClient  *IamClient
 }
 
-var AWS_END_POINT = "http://172.19.0.4:31566"
-var DEFAULT_TAG = &s3.Tag{Key: aws.String("createdBy"), Value: aws.String("s3Operator")}
 
 func (a *AwsClient) BucketExists(name string) (bool, error) {
 	_, err := a.s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(name)})
@@ -62,7 +61,7 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, 
 		a.Log.Error(err, "bucket allredy exsist")
 		return false, errors.New("bucket allredy exsist")
 	}
-	bucketInput := a.CreateBucketInput(bucketSpec.BucketName, bucketSpec.Region)
+	bucketInput := a.CreateBucketInput(bucketSpec.BucketName, config.Region())
 	res, err := a.CreateBucket(*bucketInput)
 	if err != nil {
 		a.Log.Error(err, "got error in create bucket function")
@@ -70,7 +69,8 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, 
 	}
 	a.PutBucketTagging(bucketSpec.BucketName, &bucketSpec.Tags)
 	roleName := getRoleName(bucketSpec.BucketName)
-	a.iamClient.CreateIamRole(roleName, &iam.Tag{Key: DEFAULT_TAG.Key, Value: DEFAULT_TAG.Value})
+	tag := config.DefaultTag()
+	a.iamClient.CreateIamRole(roleName, &iam.Tag{Key: tag.Key, Value: tag.Value})
 
 	a.PutBucketPolicy(bucketSpec.BucketName, roleName)
 	if bucketSpec.Encryption {
@@ -83,7 +83,7 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, 
 
 func (a *AwsClient) HandleBucketDeletion(bucketsK8S []s3operatorv1.S3Bucket) (bool, error) {
 	a.Log.Info("HandleBucketDeletion function")
-	bukcetsFromAws, err := a.getAllBucketsByTag(DEFAULT_TAG)
+	bukcetsFromAws, err := a.getAllBucketsByTag(config.DefaultTag())
 	if err != nil {
 		a.Log.Error(err, "error in HandleBucketDeletion in getAllBucketsByTag")
 		return false, err
@@ -143,7 +143,7 @@ func (a *AwsClient) PutBucketTagging(bucketName string, bucketTags *map[string]s
 		}
 		tags = append(tags, &tag)
 	}
-	tags = append(tags, DEFAULT_TAG)
+	tags = append(tags, config.DefaultTag())
 
 	input := &s3.PutBucketTaggingInput{
 		Bucket:  aws.String(bucketName),
@@ -182,7 +182,7 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 		"Version": "2012-10-17",
 		"Statement": []map[string]interface{}{
 			{
-				"Sid":    "AllPremisionToRole",
+				"Sid":    "AllPremisionToRole"+bucketName,
 				"Effect": "Allow",
 				"Principal": []string{
 					"AWS: arn:aws:iam:::role/" + roleName,
@@ -255,7 +255,7 @@ func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) ([]*string, error) {
 
 	input := resourcegroupstaggingapi.GetResourcesInput{
 		ResourceARNList:  []*string{aws.String("arn:aws:s3")},
-		ResourcesPerPage: aws.Int64(100),
+		ResourcesPerPage: config.ResourcesPerPage(),
 		TagFilters:       []*resourcegroupstaggingapi.TagFilter{{Key: filterTag.Key, Values: []*string{filterTag.Value}}},
 	}
 	err := a.RGTAClient.GetResourcesPages(&input,
@@ -279,18 +279,21 @@ func getRoleName(bucketName string) string {
 }
 
 func CreateSession() *session.Session {
-	ses := session.Must(session.NewSession(&aws.Config{
-		Region:                        aws.String(endpoints.UsEast1RegionID),
-		S3ForcePathStyle:              aws.Bool(true),
-		Endpoint:                      aws.String(AWS_END_POINT),
-		CredentialsChainVerboseErrors: aws.Bool(true),
-		DisableSSL:                    aws.Bool(true),
-	},
-	))
+	awsConfig := &aws.Config{
+		Region:                        aws.String(config.Region()),
+		S3ForcePathStyle:              aws.Bool(config.AwsS3ForcePathStyle()),
+		Endpoint:                      aws.String(config.AwsEndpoint()),
+		CredentialsChainVerboseErrors: aws.Bool(config.AwsCredentialsChainVerboseErrors()),
+		DisableSSL:                    aws.Bool(config.AwsConfigDisableSSL()),
+	}
+	awsConfig.HTTPClient = &http.Client{Timeout: config.Timeout()}
+
+	ses := session.Must(session.NewSession(awsConfig))
+
 	return ses
 }
 
-func setS3Client(Log *logr.Logger, ses *session.Session) s3.S3 {
+func setS3Client(Log *logr.Logger, ses *session.Session) *s3.S3 {
 	s3Client := s3.New(ses)
 	if s3Client == nil {
 		s3ClientErr := errors.New("error in create s3 client")
@@ -298,10 +301,10 @@ func setS3Client(Log *logr.Logger, ses *session.Session) s3.S3 {
 	} else {
 		Log.Info(" succeded create s3Client", "client", *s3Client)
 	}
-	return *s3Client
+	return s3Client
 }
 
-func setRGTAClient(Log *logr.Logger, ses *session.Session) resourcegroupstaggingapi.ResourceGroupsTaggingAPI {
+func setRGTAClient(Log *logr.Logger, ses *session.Session) *resourcegroupstaggingapi.ResourceGroupsTaggingAPI {
 	RGTAClient := resourcegroupstaggingapi.New(ses)
 	if RGTAClient == nil {
 		RGTAClientErr := errors.New("error in create RGTAClient")
@@ -309,10 +312,10 @@ func setRGTAClient(Log *logr.Logger, ses *session.Session) resourcegroupstagging
 	} else {
 		Log.Info(" succeded create RGTAClient", "client", *RGTAClient)
 	}
-	return *RGTAClient
+	return RGTAClient
 }
 
-func setClients(Log *logr.Logger) (s3.S3, resourcegroupstaggingapi.ResourceGroupsTaggingAPI, iam.IAM) {
+func setClients(Log *logr.Logger) (*s3.S3, *resourcegroupstaggingapi.ResourceGroupsTaggingAPI, *iam.IAM) {
 	ses := CreateSession()
 	if ses == nil {
 		err := errors.New("ses is nil")
@@ -321,15 +324,15 @@ func setClients(Log *logr.Logger) (s3.S3, resourcegroupstaggingapi.ResourceGroup
 		Log.Info("session", "ses", ses)
 		return setS3Client(Log, ses), setRGTAClient(Log, ses), setIamClient(Log, ses)
 	}
-	return s3.S3{}, resourcegroupstaggingapi.ResourceGroupsTaggingAPI{}, iam.IAM{}
+	return &s3.S3{}, &resourcegroupstaggingapi.ResourceGroupsTaggingAPI{}, &iam.IAM{}
 }
 
 func GetAwsClient(logger *logr.Logger) *AwsClient {
 	s3Client, rgtaClient, iamClient := setClients(logger)
 	return &AwsClient{
 		s3Client:   s3Client,
-		Log:        *logger,
+		Log:        logger,
 		RGTAClient: rgtaClient,
-		iamClient:  IamClient{IamClient: iamClient, Log: *logger},
+		iamClient:  &IamClient{IamClient: iamClient, Log: logger},
 	}
 }

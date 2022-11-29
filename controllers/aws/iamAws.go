@@ -11,8 +11,8 @@ import (
 )
 
 type IamClient struct {
-	IamClient iam.IAM
-	Log       logr.Logger
+	IamClient *iam.IAM
+	Log       *logr.Logger
 }
 
 func (c IamClient) CreateIamRole(roleName string, Tag *iam.Tag) (*iam.CreateRoleOutput, error) {
@@ -60,7 +60,7 @@ func (c IamClient) DeleteIamRole(roleName string) (*iam.DeleteRoleOutput, error)
 	}
 	return res, err
 }
-func setIamClient(Log *logr.Logger, ses *session.Session) iam.IAM {
+func setIamClient(Log *logr.Logger, ses *session.Session) *iam.IAM {
 	iamClient := iam.New(ses)
 	if iamClient == nil {
 		iamClienttErr := errors.New("error in create RGTAClient")
@@ -68,6 +68,6 @@ func setIamClient(Log *logr.Logger, ses *session.Session) iam.IAM {
 	} else {
 		Log.Info(" succeded create RGTAClient", "client", *iamClient)
 	}
-	return *iamClient
+	return iamClient
 
 }

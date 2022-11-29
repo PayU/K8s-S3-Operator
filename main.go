@@ -63,8 +63,6 @@ func main() {
 	opts := zap.Options{
 		Development: true,
 	}
-	os.Setenv("AWS_ACCESS_KEY_ID", "test")
-	os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
@@ -101,8 +99,8 @@ func main() {
 	if err = (&controllers.S3BucketReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
-		AwsClient: *aws.GetAwsClient(&Logger),
-		Log:       Logger,
+		AwsClient: aws.GetAwsClient(&Logger),
+		Log:       &Logger,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "S3Bucket")
 		os.Exit(1)

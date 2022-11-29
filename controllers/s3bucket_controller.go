@@ -32,8 +32,8 @@ import (
 type S3BucketReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
-	Log       logr.Logger
-	AwsClient awsClient.AwsClient
+	Log       *logr.Logger
+	AwsClient *awsClient.AwsClient
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete

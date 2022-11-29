@@ -10,5 +10,5 @@ metadata:
   name: s3bucket-sample
   namespace: k8s-s3-operator-system
 spec:
-  bucketName: nivbucket2
+  bucketName: sample-bukcet
   region: us-east-1
