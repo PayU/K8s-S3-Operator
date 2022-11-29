@@ -44,17 +44,12 @@ spec:
               encryption:
                 default: false
                 type: boolean
-              region:
-                pattern: (us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d
-                type: string
-                x-kubernetes-int-or-string: true
               tags:
                 additionalProperties:
                   type: string
                 type: object
             required:
             - bucketName
-            - region
             type: object
           status:
             description: S3BucketStatus defines the observed state of S3Bucket

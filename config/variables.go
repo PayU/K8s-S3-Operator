@@ -39,7 +39,7 @@ func init() {
 		}
 	}
 	if strResourcePerPage := os.Getenv("RESOURCE_PER_PAGE"); strResourcePerPage != "" {
-		if resourcePerPage, err = strconv.ParseInt(strResourcePerPage,10,64); err != nil {
+		if resourcePerPage, err = strconv.ParseInt(strResourcePerPage, 10, 64); err != nil {
 			panic(fmt.Sprintf("error on parsing resourcePerPage:[%v]", err))
 		} else {
 			resourcePerPage = 100
@@ -55,8 +55,6 @@ func init() {
 	} else {
 		awsS3ForcePathStyle = os.Getenv("AWS_S3_FORCE_PATH_STYLE") != "false"
 	}
-
-
 }
 
 func Timeout() time.Duration {
@@ -71,17 +69,17 @@ func AwsEndpoint() string {
 func AwsConfigDisableSSL() bool {
 	return awsConfigDisableSSL
 }
-func DefaultTag() *s3.Tag{
+func DefaultTag() *s3.Tag {
 	DEFAULT_TAG := &s3.Tag{Key: aws.String("createdBy"), Value: aws.String("s3Operator")}
 	return DEFAULT_TAG
 
 }
-func ResourcesPerPage()*int64{
+func ResourcesPerPage() *int64 {
 	return aws.Int64(resourcePerPage)
 }
-func AwsCredentialsChainVerboseErrors()bool{
+func AwsCredentialsChainVerboseErrors() bool {
 	return awsCredentialsChainVerboseErrors
 }
-func AwsS3ForcePathStyle()bool{
+func AwsS3ForcePathStyle() bool {
 	return awsS3ForcePathStyle
 }

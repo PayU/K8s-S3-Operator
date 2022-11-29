@@ -27,12 +27,7 @@ type S3BucketSpec struct {
 	// +kubebuilder:validation:MaxLength:=63
 	// +kubebuilder:validation:XIntOrString
 	// +kubebuilder:validation:Pattern:=^[a-z0-9][a-z0-9-]*[a-z0-9]$
-
 	BucketName string `json:"bucketName"`
-
-	// +kubebuilder:validation:XIntOrString
-	// +kubebuilder:validation:Pattern:=(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d
-	Region string `json:"region"`
 
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`

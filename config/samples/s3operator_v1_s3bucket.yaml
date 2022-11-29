@@ -11,4 +11,3 @@ metadata:
   namespace: k8s-s3-operator-system
 spec:
   bucketName: sample-bukcet2
-  region: us-east-1

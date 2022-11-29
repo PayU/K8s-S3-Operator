@@ -27,7 +27,6 @@ type AwsClient struct {
 	iamClient  *IamClient
 }
 
-
 func (a *AwsClient) BucketExists(name string) (bool, error) {
 	_, err := a.s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(name)})
 	if err != nil {
@@ -182,7 +181,7 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 		"Version": "2012-10-17",
 		"Statement": []map[string]interface{}{
 			{
-				"Sid":    "AllPremisionToRole"+bucketName,
+				"Sid":    "AllPremisionToRole" + bucketName,
 				"Effect": "Allow",
 				"Principal": []string{
 					"AWS: arn:aws:iam:::role/" + roleName,
