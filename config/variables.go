@@ -24,7 +24,7 @@ func init() {
 		region = "eu-central-1"
 	}
 	if awsEndpoint = os.Getenv("AWS_ENDPOINT"); awsEndpoint == "" {
-		awsEndpoint = "http://k8s-s3-operator-system.localstack:4566"
+		awsEndpoint = "http://localstack.k8s-s3-operator-system:4566"
 	}
 	if os.Getenv("AWS_CONFIG_DISABLE_SSL") == "" {
 		awsConfigDisableSSL = true

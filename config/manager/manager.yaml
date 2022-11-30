@@ -62,8 +62,8 @@ spec:
             memory: 64Mi
         env:
         - name: AWS_SECRET_ACCESS_KEY
-          value: "test"
+          value: test
         - name: AWS_ACCESS_KEY_ID
-          value: "test"
+          value: test
       serviceAccountName: k8s-s3-operator-controller-manager
       terminationGracePeriodSeconds: 10
