@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
-	"github.com/PayU/K8s-S3-Operator/config"
+	"github.com/PayU/K8s-S3-Operator/controllers/config"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"

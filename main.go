@@ -35,7 +35,7 @@ import (
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	"github.com/PayU/K8s-S3-Operator/controllers"
 	"github.com/PayU/K8s-S3-Operator/controllers/aws"
-	"github.com/PayU/K8s-S3-Operator/config"
+	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	//+kubebuilder:scaffold:imports
 )
 
