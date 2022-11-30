@@ -14,7 +14,7 @@ var awsEndpoint string
 var region string
 var awsConfigDisableSSL bool
 var timeout int
-var resourcePerPage int64
+var resourcePerPage int64 = 100
 var awsCredentialsChainVerboseErrors bool
 var awsS3ForcePathStyle bool
 var devMode bool

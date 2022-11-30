@@ -53,15 +53,24 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	r.Log.Info("REQUST IS", "req name", req.Name)
 	var s3Bucket s3operatorv1.S3Bucket
 	if err := r.Get(context.TODO(), req.NamespacedName, &s3Bucket); err != nil {
-		r.Log.Error(err, "error with geting s3 bucket")
 		bucketList := &s3operatorv1.S3BucketList{}
 		err := r.List(context.TODO(), bucketList)
 		if err != nil {
 			r.Log.Error(err, "error on list s3 k8s resorces")
 		} else {
-			r.AwsClient.HandleBucketDeletion(bucketList.Items)
+			isDeleted, errInDeletion := r.AwsClient.HandleBucketDeletion(bucketList.Items)
+			if !isDeleted && errInDeletion == nil { // error in getting s3 object
+				r.Log.Error(err, "error with geting s3 bucket")
+			} else {
+				if isDeleted {
+					r.Log.Info("succeded to delete bucket")
+				} else {
+					r.Log.Error(errInDeletion, "error in HandleBucketDeletion")
+				}
+			}
 
 		}
+
 		return ctrl.Result{Requeue: true}, nil
 	}
 	if !s3Bucket.Status.IsCreated {

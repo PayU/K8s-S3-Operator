@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
 type AwsClient struct {
@@ -82,28 +83,35 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, 
 
 func (a *AwsClient) HandleBucketDeletion(bucketsK8S []s3operatorv1.S3Bucket) (bool, error) {
 	a.Log.Info("HandleBucketDeletion function")
+	deleteFlag := false
 	bukcetsFromAws, err := a.getAllBucketsByTag(config.DefaultTag())
 	if err != nil {
 		a.Log.Error(err, "error in HandleBucketDeletion in getAllBucketsByTag")
 		return false, err
 	}
+	a.Log.Info("got buckets from getAllBucketsByTag", "bucket", bukcetsFromAws)
 	mapResourceK8s := make(map[string]struct{}, len(bucketsK8S))
 	for _, b := range bucketsK8S {
 		mapResourceK8s[b.Spec.BucketName] = struct{}{}
 	}
 	for _, bucketName := range bukcetsFromAws {
 		if _, found := mapResourceK8s[*bucketName]; !found {
+			err := a.CleanupsBucket(*bucketName)
+			if err != nil {
+				a.Log.Error(err, "error in CleanupsBucket in bucket: "+*bucketName)
+				return false, err
+			}
 			res, err := a.DeleteBucket(*bucketName)
 			if err != nil {
 				a.Log.Error(err, "err delete bucket"+*bucketName)
 				return false, err
 			}
-			a.DeleteBucketPolicy(*bucketName)
 			a.iamClient.DeleteIamRole(getRoleName(*bucketName))
 			a.Log.Info("succeded to delete bucket", "res", res)
+			deleteFlag = true
 		}
 	}
-	return true, nil
+	return deleteFlag, nil
 }
 
 func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
@@ -170,6 +178,17 @@ func (a *AwsClient) DeleteBucket(bucketName string) (*s3.DeleteBucketOutput, err
 	a.Log.Info("DeleteBucket function")
 	res, err := a.s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
 	return res, err
+}
+func (a *AwsClient) CleanupsBucket(bucketName string) error {
+	iter := s3manager.NewDeleteListIterator(a.s3Client, &s3.ListObjectsInput{
+		Bucket: aws.String(bucketName),
+	})
+	if err := s3manager.NewBatchDeleteWithClient(a.s3Client).Delete(aws.BackgroundContext(), iter); err != nil {
+		a.Log.Error(err, "Unable to delete objects from bucket %q", bucketName)
+		return err
+	}
+	a.Log.Info("succeded to cleanup bucket: " + bucketName)
+	return nil
 }
 
 func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.PutBucketPolicyOutput, error) {
@@ -259,7 +278,9 @@ func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) ([]*string, error) {
 	}
 	err := a.RGTAClient.GetResourcesPages(&input,
 		func(page *resourcegroupstaggingapi.GetResourcesOutput, isLastPage bool) bool {
+			a.Log.Info("in GetResourcesPages ", "page", page)
 			for _, b := range page.ResourceTagMappingList {
+				a.Log.Info("in for loop on page", "b", b)
 				bucketSplitArrayARN := strings.Split(*b.ResourceARN, ":")
 				buckets = append(buckets, &bucketSplitArrayARN[len(bucketSplitArrayARN)-1])
 			}
