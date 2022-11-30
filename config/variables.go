@@ -17,6 +17,7 @@ var timeout int
 var resourcePerPage int64
 var awsCredentialsChainVerboseErrors bool
 var awsS3ForcePathStyle bool
+var devMode bool
 
 func init() {
 	var err error
@@ -55,6 +56,11 @@ func init() {
 	} else {
 		awsS3ForcePathStyle = os.Getenv("AWS_S3_FORCE_PATH_STYLE") != "false"
 	}
+	if os.Getenv("DEVMODE") == "true"{
+		devMode =true
+	}else{
+		devMode =false
+	}
 }
 
 func Timeout() time.Duration {
@@ -82,4 +88,7 @@ func AwsCredentialsChainVerboseErrors() bool {
 }
 func AwsS3ForcePathStyle() bool {
 	return awsS3ForcePathStyle
+}
+func DevMode()bool{
+	return devMode
 }
