@@ -48,7 +48,7 @@ func (c IamClient) CreateIamRole(roleName string, Tag *iam.Tag) (*iam.CreateRole
 }
 
 func (c IamClient) DeleteIamRole(roleName string) (*iam.DeleteRoleOutput, error) {
-	c.Log.Info("DeleteIamRole function")
+	c.Log.Info("DeleteIamRole function roleName: " + roleName)
 	input := iam.DeleteRoleInput{
 		RoleName: &roleName,
 	}
@@ -61,6 +61,7 @@ func (c IamClient) DeleteIamRole(roleName string) (*iam.DeleteRoleOutput, error)
 	return res, err
 }
 func setIamClient(Log *logr.Logger, ses *session.Session) *iam.IAM {
+	Log.Info("create iamClient wit session", "session", *ses)
 	iamClient := iam.New(ses)
 	if iamClient == nil {
 		iamClienttErr := errors.New("error in create RGTAClient")

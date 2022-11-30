@@ -29,6 +29,7 @@ type AwsClient struct {
 }
 
 func (a *AwsClient) BucketExists(name string) (bool, error) {
+	a.Log.Info("check if bucket :" + name + "exists")
 	_, err := a.s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(name)})
 	if err != nil {
 		if awsErr, isAwsErr := err.(awserr.Error); isAwsErr && awsErr.Code() == s3.ErrCodeNoSuchBucket {
@@ -38,23 +39,27 @@ func (a *AwsClient) BucketExists(name string) (bool, error) {
 	}
 	return true, nil
 }
-func (a *AwsClient) validateBucketName(name string) bool {
+func (a *AwsClient) validateBucketName(name string) (bool, error) {
 	if len(name) > 4 && name[:4] == "xn--" {
-		return false
+		return false, errors.New("bucket name can't start with xn--")
 	}
 	if len(name) > 8 && name[len(name)-8:] == "-s3alias" {
-		return false
+		return false, errors.New("bucket name can't end with -s3alias")
 	}
 	match, _ := regexp.MatchString("^[a-zA-Z][a-zA-Z0-9\\-]+[a-zA-Z0-9]$", name)
-	return match
+	if !match {
+
+		return match, errors.New("bucket name not mutch pattern: '^[a-zA-Z][a-zA-Z0-9\\-]+[a-zA-Z0-9]$' ")
+	}
+	return match, nil
 }
 
-func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, resourceName string) (bool, error) {
-	a.Log.Info("HandleBucketCreation")
-	if !a.validateBucketName(bucketSpec.BucketName) {
-		validateErr := errors.New("error bucket name is unvalid")
-		a.Log.Error(validateErr, "bucket name is unvalid")
-		return false, validateErr
+func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec) (bool, error) {
+	a.Log.Info("HandleBucketCreation", "bucketSpec", bucketSpec)
+	validName, err := a.validateBucketName(bucketSpec.BucketName)
+	if !validName {
+		a.Log.Error(err, "bucket name is unvalid")
+		return false, err
 	}
 	BucketExist, err := a.BucketExists(bucketSpec.BucketName)
 	if BucketExist {
@@ -115,7 +120,7 @@ func (a *AwsClient) HandleBucketDeletion(bucketsK8S []s3operatorv1.S3Bucket) (bo
 }
 
 func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
-	a.Log.Info("CreateBucket function")
+	a.Log.Info("CreateBucket function", "bucketInput", bucketInput)
 	res, err := a.s3Client.CreateBucket(&bucketInput)
 	if err != nil { //  cast err to awserr.Error to get the Code and
 		if aerr, ok := err.(awserr.Error); ok {
@@ -156,6 +161,7 @@ func (a *AwsClient) PutBucketTagging(bucketName string, bucketTags *map[string]s
 		Bucket:  aws.String(bucketName),
 		Tagging: &s3.Tagging{TagSet: tags},
 	}
+	a.Log.Info("PutBucketTagging", "input", input)
 	res, err := a.s3Client.PutBucketTagging(input)
 	if err != nil {
 		a.Log.Error(err, "error PutBucketTagging")
@@ -170,16 +176,17 @@ func (a *AwsClient) CreateBucketInput(bucketName string, bucketRegion string) *s
 		Bucket: aws.String(bucketName),
 	}
 	s3Input.CreateBucketConfiguration = &s3.CreateBucketConfiguration{LocationConstraint: aws.String(bucketRegion)}
-	a.Log.Info("bucketInput", "bucketInput", s3Input)
 	return s3Input
 }
 
 func (a *AwsClient) DeleteBucket(bucketName string) (*s3.DeleteBucketOutput, error) {
-	a.Log.Info("DeleteBucket function")
+	a.Log.Info("DeleteBucket function -  delete bucket: " + bucketName)
 	res, err := a.s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
 	return res, err
 }
 func (a *AwsClient) CleanupsBucket(bucketName string) error {
+	a.Log.Info("CleanupsBucket function -  clean bucket: " + bucketName)
+
 	iter := s3manager.NewDeleteListIterator(a.s3Client, &s3.ListObjectsInput{
 		Bucket: aws.String(bucketName),
 	})
@@ -192,7 +199,7 @@ func (a *AwsClient) CleanupsBucket(bucketName string) error {
 }
 
 func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.PutBucketPolicyOutput, error) {
-	a.Log.Info("PutBucketPolicy fuction")
+	a.Log.Info("PutBucketPolicy fuction bucket: " + bucketName + ", roleName:" + roleName)
 
 	// Create a policy using map interface. Filling in the bucket as the
 	// resource.
@@ -226,13 +233,13 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 		Bucket: &bucketName,
 		Policy: aws.String(string(bucketPolicy)),
 	}
-
+	a.Log.Info("PutBucketPolicy input:", "input", input)
 	res, err := a.s3Client.PutBucketPolicy(input)
 	return res, err
 
 }
 func (a *AwsClient) PutBucketEncrypt(bucketName string) (bool, error) {
-	a.Log.Info("PutBucketEncrypt function")
+	a.Log.Info("PutBucketEncrypt function , bucket: " + bucketName)
 	encryptRules := []*s3.ServerSideEncryptionRule{{
 		BucketKeyEnabled:                   aws.Bool(true),
 		ApplyServerSideEncryptionByDefault: &s3.ServerSideEncryptionByDefault{SSEAlgorithm: aws.String("AES256")}},
@@ -245,6 +252,7 @@ func (a *AwsClient) PutBucketEncrypt(bucketName string) (bool, error) {
 		Bucket:                            &bucketName,
 		ServerSideEncryptionConfiguration: &sSEncryptConfiguration,
 	}
+	a.Log.Info("PutBucketEncryption input: ", "input", input)
 	res, err := a.s3Client.PutBucketEncryption(input)
 	if err != nil {
 		a.Log.Error(err, "not succsede to PutBucketEncrypt")
@@ -256,10 +264,11 @@ func (a *AwsClient) PutBucketEncrypt(bucketName string) (bool, error) {
 }
 
 func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolicyOutput, error) {
-	a.Log.Info("DeleteBucketPolicy function")
+	a.Log.Info("DeleteBucketPolicy function, bucket: "+bucketName)
 	input := &s3.DeleteBucketPolicyInput{
 		Bucket: &bucketName,
 	}
+	a.Log.Info("DeleteBucketPolicy input: ", "input", input)
 	res, err := a.s3Client.DeleteBucketPolicy(input)
 	if err != nil {
 		a.Log.Error(err, "error in DeleteBucketPolicy")
@@ -298,7 +307,7 @@ func getRoleName(bucketName string) string {
 	return roleName
 }
 
-func CreateSession() *session.Session {
+func CreateSession(Log *logr.Logger) *session.Session {
 	awsConfig := &aws.Config{
 		Region:                        aws.String(config.Region()),
 		S3ForcePathStyle:              aws.Bool(config.AwsS3ForcePathStyle()),
@@ -307,13 +316,14 @@ func CreateSession() *session.Session {
 		DisableSSL:                    aws.Bool(config.AwsConfigDisableSSL()),
 	}
 	awsConfig.HTTPClient = &http.Client{Timeout: config.Timeout()}
-
+	Log.Info("Create Session with aws config :", "awsConfig",awsConfig)
 	ses := session.Must(session.NewSession(awsConfig))
 
 	return ses
 }
 
 func setS3Client(Log *logr.Logger, ses *session.Session) *s3.S3 {
+	Log.Info("create s3Client wit session", "session",*ses)
 	s3Client := s3.New(ses)
 	if s3Client == nil {
 		s3ClientErr := errors.New("error in create s3 client")
@@ -325,6 +335,7 @@ func setS3Client(Log *logr.Logger, ses *session.Session) *s3.S3 {
 }
 
 func setRGTAClient(Log *logr.Logger, ses *session.Session) *resourcegroupstaggingapi.ResourceGroupsTaggingAPI {
+	Log.Info("create RGTAClient wit session", "session",*ses)
 	RGTAClient := resourcegroupstaggingapi.New(ses)
 	if RGTAClient == nil {
 		RGTAClientErr := errors.New("error in create RGTAClient")
@@ -336,7 +347,7 @@ func setRGTAClient(Log *logr.Logger, ses *session.Session) *resourcegroupstaggin
 }
 
 func setClients(Log *logr.Logger) (*s3.S3, *resourcegroupstaggingapi.ResourceGroupsTaggingAPI, *iam.IAM) {
-	ses := CreateSession()
+	ses := CreateSession(Log)
 	if ses == nil {
 		err := errors.New("ses is nil")
 		Log.Error(err, "error in create new session")

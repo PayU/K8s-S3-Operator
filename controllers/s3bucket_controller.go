@@ -50,7 +50,6 @@ type S3BucketReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.Info("REQUST IS", "req name", req.Name)
 	var s3Bucket s3operatorv1.S3Bucket
 	if err := r.Get(context.TODO(), req.NamespacedName, &s3Bucket); err != nil {
 		bucketList := &s3operatorv1.S3BucketList{}
@@ -74,7 +73,7 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{Requeue: true}, nil
 	}
 	if !s3Bucket.Status.IsCreated {
-		res, _ := r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, req.Name)
+		res, _ := r.AwsClient.HandleBucketCreation(&s3Bucket.Spec)
 		s3Bucket.Status.IsCreated = res
 		r.Status().Update(context.Background(), &s3Bucket)
 	}
