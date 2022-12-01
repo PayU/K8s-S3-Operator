@@ -123,7 +123,7 @@ func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBu
 			return nil, err
 		}
 	}
-	a.Log.Info("succsede from bucket creation", "bucket_name", res., "region", res.Location,)
+	a.Log.Info("succsede from bucket creation", "bucket_name",*bucketInput.Bucket, "region", *bucketInput.CreateBucketConfiguration.LocationConstraint)
 	return res, nil
 
 }
@@ -143,13 +143,13 @@ func (a *AwsClient) PutBucketTagging(bucketName string, bucketTags *map[string]s
 		Bucket:  aws.String(bucketName),
 		Tagging: &s3.Tagging{TagSet: tags},
 	}
-	a.Log.Info("PutBucketTagging", "input", input)
-	res, err := a.s3Client.PutBucketTagging(input)
+	a.Log.Info("PutBucketTagging", "bucket_name", *input.Bucket, "bucket_tags", *input.Tagging)
+	_, err := a.s3Client.PutBucketTagging(input)
 	if err != nil {
-		a.Log.Error(err, "error PutBucketTagging")
+		a.Log.Error(err, "error PutBucketTagging", "bucket_name", *input.Bucket)
 		return false, err
 	}
-	a.Log.Info("succeded to PutBucketTagging", "res", res, "input", input)
+	a.Log.Info("succeded to PutBucketTagging", "bucket_name", *input.Bucket, "bucket_tags", *input.Tagging)
 	return true, nil
 }
 
@@ -162,26 +162,26 @@ func (a *AwsClient) CreateBucketInput(bucketName string, bucketRegion string) *s
 }
 
 func (a *AwsClient) DeleteBucket(bucketName string) (*s3.DeleteBucketOutput, error) {
-	a.Log.Info("DeleteBucket function -  delete bucket: " + bucketName)
+	a.Log.Info("DeleteBucket function", "bucket_name", bucketName)
 	res, err := a.s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
 	return res, err
 }
 func (a *AwsClient) CleanupsBucket(bucketName string) error {
-	a.Log.Info("CleanupsBucket function -  clean bucket: " + bucketName)
+	a.Log.Info("CleanupsBucket function", "bucket_name",bucketName)
 
 	iter := s3manager.NewDeleteListIterator(a.s3Client, &s3.ListObjectsInput{
 		Bucket: aws.String(bucketName),
 	})
 	if err := s3manager.NewBatchDeleteWithClient(a.s3Client).Delete(aws.BackgroundContext(), iter); err != nil {
-		a.Log.Error(err, "Unable to delete objects from bucket %q", bucketName)
+		a.Log.Error(err, "Unable to delete objects from bucket", "bucket_name", bucketName)
 		return err
 	}
-	a.Log.Info("succeded to cleanup bucket: " + bucketName)
+	a.Log.Info("succeded to cleanup bucket", "bucket_name", bucketName)
 	return nil
 }
 
 func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.PutBucketPolicyOutput, error) {
-	a.Log.Info("PutBucketPolicy fuction bucket: " + bucketName + ", roleName:" + roleName)
+	a.Log.Info("PutBucketPolicy fuction bucket", "bucket_name", bucketName, "roleName:", roleName)
 
 	// Create a policy using map interface. Filling in the bucket as the
 	// resource.
@@ -206,7 +206,7 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 	}
 	bucketPolicy, err := json.Marshal(AllPremisionToRole)
 	if err != nil {
-		a.Log.Error(err, "error in PutBucketPolicy in Marshal")
+		a.Log.Error(err, "error in PutBucketPolicy in Marshal", "bucket_name", bucketName, "roleName:", roleName)
 		return nil, err
 
 	}
@@ -215,13 +215,13 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 		Bucket: &bucketName,
 		Policy: aws.String(string(bucketPolicy)),
 	}
-	a.Log.Info("PutBucketPolicy input:", "input", input)
+	a.Log.Info("PutBucketPolicy input","bucket_name", bucketName, "policy:", *input.Policy)
 	res, err := a.s3Client.PutBucketPolicy(input)
 	return res, err
 
 }
 func (a *AwsClient) PutBucketEncrypt(bucketName string) (bool, error) {
-	a.Log.Info("PutBucketEncrypt function , bucket: " + bucketName)
+	a.Log.Info("PutBucketEncrypt function","bucket_name", bucketName)
 	encryptRules := []*s3.ServerSideEncryptionRule{{
 		BucketKeyEnabled:                   aws.Bool(true),
 		ApplyServerSideEncryptionByDefault: &s3.ServerSideEncryptionByDefault{SSEAlgorithm: aws.String("AES256")}},
@@ -234,26 +234,25 @@ func (a *AwsClient) PutBucketEncrypt(bucketName string) (bool, error) {
 		Bucket:                            &bucketName,
 		ServerSideEncryptionConfiguration: &sSEncryptConfiguration,
 	}
-	a.Log.Info("PutBucketEncryption input: ", "input", input)
-	res, err := a.s3Client.PutBucketEncryption(input)
+	a.Log.Info("PutBucketEncryption input", "bucket_name", bucketName, "ServerSideEncryptionConfiguration:", *input.ServerSideEncryptionConfiguration)
+	_, err := a.s3Client.PutBucketEncryption(input)
 	if err != nil {
 		a.Log.Error(err, "not succsede to PutBucketEncrypt")
 		return false, err
 	}
-	a.Log.Info("succeded to encrypt bucket", "res", res)
+	a.Log.Info("succeded to encrypt bucket", "bucket_name", bucketName)
 	return true, nil
 
 }
 
 func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolicyOutput, error) {
-	a.Log.Info("DeleteBucketPolicy function, bucket: " + bucketName)
+	a.Log.Info("DeleteBucketPolicy function" ,"bucket_name", bucketName)
 	input := &s3.DeleteBucketPolicyInput{
 		Bucket: &bucketName,
 	}
-	a.Log.Info("DeleteBucketPolicy input: ", "input", input)
 	res, err := a.s3Client.DeleteBucketPolicy(input)
 	if err != nil {
-		a.Log.Error(err, "error in DeleteBucketPolicy")
+		a.Log.Error(err, "error in DeleteBucketPolicy","bucket_name", bucketName)
 	}
 	return res, err
 }
@@ -298,7 +297,7 @@ func CreateSession(Log *logr.Logger) *session.Session {
 		DisableSSL:                    aws.Bool(config.AwsConfigDisableSSL()),
 	}
 	awsConfig.HTTPClient = &http.Client{Timeout: config.Timeout()}
-	Log.Info("Create Session with aws config :", "awsConfig", awsConfig)
+	Log.Info("Create Session with aws config ", "Region", awsConfig.Region,"Endpoint",awsConfig.Endpoint)
 	ses := session.Must(session.NewSession(awsConfig))
 
 	return ses
