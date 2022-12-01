@@ -11,4 +11,3 @@ metadata:
   namespace: k8s-s3-operator-system
 spec:
   encryption: true
-  bucketName: sample-bukcet1

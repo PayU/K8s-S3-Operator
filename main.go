@@ -63,7 +63,6 @@ func main() {
 
 	opts := zap.Options{
 		Development: config.DevMode(),
-		
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()

@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"regexp"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
@@ -50,35 +51,29 @@ type S3BucketReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	 Log := r.Log.WithValues("namespace", req.Namespace,"resource_name", req.Name)
+	 r.Log = &Log
 	var s3Bucket s3operatorv1.S3Bucket
-	if err := r.Get(context.TODO(), req.NamespacedName, &s3Bucket); err != nil {
-		bucketList := &s3operatorv1.S3BucketList{}
-		err := r.List(context.TODO(), bucketList)
-		if err != nil {
-			r.Log.Error(err, "error on list s3 k8s resorces")
-		} else {
-			isDeleted, errInDeletion := r.AwsClient.HandleBucketDeletion(bucketList.Items)
-			if !isDeleted && errInDeletion == nil { // error in getting s3 object
-				r.Log.Error(err, "error with geting s3 bucket")
-			} else {
-				if isDeleted {
-					r.Log.Info("succeded to delete bucket")
-				} else {
-					r.Log.Error(errInDeletion, "error in HandleBucketDeletion")
-				}
-			}
-
+	errToGet := r.Get(context.TODO(), req.NamespacedName, &s3Bucket)
+	if errToGet != nil {
+		if CheckIfNotFoundError(req.Name, errToGet.Error()) { // check if resource not exists
+			_, errDel := r.AwsClient.HandleBucketDeletion(req.Name)
+			return ctrl.Result{Requeue: true}, errDel
+		} else { //unexpcted error
+			r.Log.Error(errToGet, "unexpcted error in Get in Reconcile function", "req.Name", req.Name, "namespace", req.Namespace)
+			return ctrl.Result{Requeue: true}, errToGet
 		}
 
-		return ctrl.Result{Requeue: true}, nil
+	} else { //succeded to get resource, check if need to create or update
+		isbucketExists, err := r.AwsClient.BucketExists(s3Bucket.Name)
+		if isbucketExists {
+			r.Log.Info("going to update flow", "bucket_name", s3Bucket.Name, "req.name", req.Name, "namespace", req.Namespace)
+			//todo: insert update flow
+		} else { //bucket not exists in aws, create
+			_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name)
+		}
+		return ctrl.Result{Requeue: true}, err
 	}
-	if !s3Bucket.Status.IsCreated {
-		res, _ := r.AwsClient.HandleBucketCreation(&s3Bucket.Spec)
-		s3Bucket.Status.IsCreated = res
-		r.Status().Update(context.Background(), &s3Bucket)
-	}
-
-	return ctrl.Result{Requeue: true}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -86,4 +81,12 @@ func (r *S3BucketReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&s3operatorv1.S3Bucket{}).
 		Complete(r)
+}
+
+
+func CheckIfNotFoundError(reqName string, errStr string) bool {
+	pattern := reqName + "\" not found"
+	match, _ := regexp.MatchString(pattern, errStr)
+	return match
+
 }

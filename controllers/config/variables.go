@@ -56,10 +56,10 @@ func init() {
 	} else {
 		awsS3ForcePathStyle = os.Getenv("AWS_S3_FORCE_PATH_STYLE") != "false"
 	}
-	if os.Getenv("DEVMODE") == "true"{
-		devMode =true
-	}else{
-		devMode =false
+	if os.Getenv("DEVMODE") == "true" {
+		devMode = true
+	} else {
+		devMode = false
 	}
 }
 
@@ -89,6 +89,6 @@ func AwsCredentialsChainVerboseErrors() bool {
 func AwsS3ForcePathStyle() bool {
 	return awsS3ForcePathStyle
 }
-func DevMode()bool{
+func DevMode() bool {
 	return devMode
 }

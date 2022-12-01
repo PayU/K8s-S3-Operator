@@ -23,12 +23,6 @@ import (
 // S3BucketSpec defines the desired state of S3Bucket
 type S3BucketSpec struct {
 
-	// +kubebuilder:validation:MinLength:=3
-	// +kubebuilder:validation:MaxLength:=63
-	// +kubebuilder:validation:XIntOrString
-	// +kubebuilder:validation:Pattern:=^[a-z0-9][a-z0-9-]*[a-z0-9]$
-	BucketName string `json:"bucketName"`
-
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`
 
@@ -39,8 +33,6 @@ type S3BucketSpec struct {
 
 // S3BucketStatus defines the observed state of S3Bucket
 type S3BucketStatus struct {
-	// +kubebuilder:default:=false
-	IsCreated bool `json:"isReady"`
 }
 
 //+kubebuilder:object:root=true
