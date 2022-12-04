@@ -108,6 +108,7 @@ func (a *AwsClient) HandleBucketUpdate(bucketName string, bucketSpec *s3operator
 	a.Log.Info("HandleBucketUpdate function")
 	res, err := a.UpdateBucketTags(bucketName, bucketSpec.Tags)
 
+	a.Log.Info("finish to HandleBucketUpdate")
 	return res, err
 }
 
@@ -123,6 +124,9 @@ func (a *AwsClient) UpdateBucketTags(bucketName string, tagsToUpdate map[string]
 		_, err := a.s3Client.PutBucketTagging(&s3.PutBucketTaggingInput{Bucket: &bucketName, Tagging: &s3.Tagging{TagSet: diffTags}})
 		if err != nil {
 			a.Log.Error(err, "error from PutBucketTagging")
+		}else{ 
+			a.Log.Info("finish to update tags")
+
 		}
 	}
 	return true, nil
@@ -136,10 +140,17 @@ func (a *AwsClient) FindDiffTags(tagsToUpdate map[string]string, tagsFromAws []*
 		mapTagsFromAws[tag.String()] = struct{}{}
 	}
 	for key, val := range tagsToUpdate {
-		tag := s3.Tag{Key: &key, Value: &val}
+		Tagkey := key
+		Tagval := val
+		tag := s3.Tag{Key: &Tagkey, Value: &Tagval}
 		if _, found := mapTagsFromAws[tag.String()]; !found {
 			diffTags = append(diffTags, &tag)
 		}
+	}
+	if len(diffTags) > 0{
+		a.Log.Info("found tags to update", "tagsToUpdate", diffTags)
+	}else {
+		a.Log.Info("no tags to update")
 	}
 	return diffTags
 }
