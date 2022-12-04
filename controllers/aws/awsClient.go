@@ -30,7 +30,6 @@ type AwsClient struct {
 
 func (a *AwsClient) BucketExists(name string,log *logr.Logger) (bool, error) {
 	a.Log = log
-	// a.LogWithVal(name).Info("check if bucket Bucket Exists")
 	_, err := a.s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(name)})
 	if err != nil {
 		if awsErr, isAwsErr := err.(awserr.Error); isAwsErr && awsErr.Code() == s3.ErrCodeNoSuchBucket {
