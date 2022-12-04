@@ -11,3 +11,6 @@ metadata:
   namespace: k8s-s3-operator-system
 spec:
   encryption: true
+  tags:
+    key: value
+    key2: val2

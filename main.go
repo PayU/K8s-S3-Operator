@@ -96,7 +96,7 @@ func main() {
 	Logger := zap.New(zap.UseFlagOptions(&opts)).
 		WithName("controllers").
 		WithName("s3Operator")
-
+	
 	if err = (&controllers.S3BucketReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),

@@ -51,26 +51,25 @@ type S3BucketReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	 Log := r.Log.WithValues("namespace", req.Namespace,"resource_name", req.Name)
-	 r.Log = &Log
+	log := r.Log.WithValues("namespace", req.Namespace, "resource_name", req.Name)
 	var s3Bucket s3operatorv1.S3Bucket
 	errToGet := r.Get(context.TODO(), req.NamespacedName, &s3Bucket)
 	if errToGet != nil {
 		if CheckIfNotFoundError(req.Name, errToGet.Error()) { // check if resource not exists
-			_, errDel := r.AwsClient.HandleBucketDeletion(req.Name)
+			_, errDel := r.AwsClient.HandleBucketDeletion(req.Name, &log)
 			return ctrl.Result{Requeue: true}, errDel
 		} else { //unexpcted error
-			r.Log.Error(errToGet, "unexpcted error in Get in Reconcile function", "req.Name", req.Name, "namespace", req.Namespace)
+			log.Error(errToGet, "unexpcted error in Get in Reconcile function")
 			return ctrl.Result{Requeue: true}, errToGet
 		}
 
 	} else { //succeded to get resource, check if need to create or update
-		isbucketExists, err := r.AwsClient.BucketExists(s3Bucket.Name)
+		isbucketExists, err := r.AwsClient.BucketExists(s3Bucket.Name, &log)
 		if isbucketExists {
-			r.Log.Info("going to update flow", "bucket_name", s3Bucket.Name, "req.name", req.Name, "namespace", req.Namespace)
-			//todo: insert update flow
+			log.Info("going to update flow")
+			_, err = r.AwsClient.HandleBucketUpdate(s3Bucket.Name, &s3Bucket.Spec, &log)
 		} else { //bucket not exists in aws, create
-			_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name)
+			_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name, &log)
 		}
 		return ctrl.Result{Requeue: true}, err
 	}
@@ -82,7 +81,6 @@ func (r *S3BucketReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&s3operatorv1.S3Bucket{}).
 		Complete(r)
 }
-
 
 func CheckIfNotFoundError(reqName string, errStr string) bool {
 	pattern := reqName + "\" not found"
