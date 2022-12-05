@@ -3,11 +3,20 @@ package tests
 import (
 	"os"
 	"testing"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3"
+	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
+
+
+
 
 )
 
 func TestMain(m *testing.M){
 	// run local env befor 
+	ses := awsClient.CreateSession()
+	s3Client := awsClient.SetS3Client(ses)
 	
 	
 	exitVal := m.Run()
@@ -21,6 +30,7 @@ func TestCreateBucket(t *testing.T) {
 }
 func TestPutBucketData(t *testing.T) {
 	t.Log("TestPutBucketData")
+
 }
 func TestFetchBucketData(t *testing.T) {
 	t.Log("TestFetchBucketData")
