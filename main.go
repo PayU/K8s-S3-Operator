@@ -35,6 +35,7 @@ import (
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	"github.com/PayU/K8s-S3-Operator/controllers"
 	"github.com/PayU/K8s-S3-Operator/controllers/aws"
+	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -61,10 +62,8 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 
 	opts := zap.Options{
-		Development: true,
+		Development: config.DevMode(),
 	}
-	os.Setenv("AWS_ACCESS_KEY_ID", "test")
-	os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
@@ -97,12 +96,12 @@ func main() {
 	Logger := zap.New(zap.UseFlagOptions(&opts)).
 		WithName("controllers").
 		WithName("s3Operator")
-
+	
 	if err = (&controllers.S3BucketReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
-		AwsClient: *aws.GetAwsClient(&Logger),
-		Log:       Logger,
+		AwsClient: aws.GetAwsClient(&Logger),
+		Log:       &Logger,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "S3Bucket")
 		os.Exit(1)

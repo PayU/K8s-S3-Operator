@@ -11,12 +11,12 @@ import (
 )
 
 type IamClient struct {
-	IamClient iam.IAM
-	Log       logr.Logger
+	IamClient *iam.IAM
+	Log       *logr.Logger
 }
 
 func (c IamClient) CreateIamRole(roleName string, Tag *iam.Tag) (*iam.CreateRoleOutput, error) {
-	c.Log.Info("CreateIamRole function")
+	c.Log.Info("CreateIamRole function", "role_name", roleName)
 	policy, err := json.Marshal(map[string]interface{}{
 		"Version": "2012-10-17",
 		"Statement": []map[string]interface{}{
@@ -40,34 +40,35 @@ func (c IamClient) CreateIamRole(roleName string, Tag *iam.Tag) (*iam.CreateRole
 	}
 	res, err := c.IamClient.CreateRole(&input)
 	if err != nil {
-		c.Log.Error(err, "error in CreateIamRole in CreateRole")
+		c.Log.Error(err, "error in CreateIamRole in CreateRole", "role_name", roleName)
 	} else {
-		c.Log.Info("succeded to create iam role", "res", res)
+		c.Log.Info("succeded to create iam role", "role_from_res", res.Role)
 	}
 	return res, err
 }
 
 func (c IamClient) DeleteIamRole(roleName string) (*iam.DeleteRoleOutput, error) {
-	c.Log.Info("DeleteIamRole function")
+	c.Log.Info("DeleteIamRole function", "role_name", roleName)
 	input := iam.DeleteRoleInput{
 		RoleName: &roleName,
 	}
 	res, err := c.IamClient.DeleteRole(&input)
 	if err != nil {
-		c.Log.Error(err, "error in DeleteIamRole in DeleteRole")
+		c.Log.Error(err, "error in DeleteIamRole in DeleteRole", "role_name", roleName)
 	} else {
-		c.Log.Info("succeded to delete iam role", "res", res)
+		c.Log.Info("succeded to delete iam role", "role_name", roleName)
 	}
 	return res, err
 }
-func setIamClient(Log *logr.Logger, ses *session.Session) iam.IAM {
+func setIamClient(Log *logr.Logger, ses *session.Session) *iam.IAM {
+	Log.Info("create iamClient wit session", "session", *ses)
 	iamClient := iam.New(ses)
 	if iamClient == nil {
-		iamClienttErr := errors.New("error in create RGTAClient")
-		Log.Error(iamClienttErr, "didnt succeded to create s3Client")
+		iamClienttErr := errors.New("error in create iamClient")
+		Log.Error(iamClienttErr, "didnt succeded to create iamClient")
 	} else {
-		Log.Info(" succeded create RGTAClient", "client", *iamClient)
+		Log.Info(" succeded create iamClient", "client", *iamClient)
 	}
-	return *iamClient
+	return iamClient
 
 }
