@@ -16,7 +16,7 @@ import (
 func TestMain(m *testing.M){
 	// run local env befor 
 	ses := awsClient.CreateSession()
-	s3Client := awsClient.SetS3Client(ses)
+	s3Client := awsClient.setS3Client(ses)
 	
 	
 	exitVal := m.Run()
