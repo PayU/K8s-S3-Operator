@@ -35,31 +35,16 @@ spec:
           spec:
             description: S3BucketSpec defines the desired state of S3Bucket
             properties:
-              bucketName:
-                maxLength: 63
-                minLength: 3
-                pattern: ^[a-z0-9][a-z0-9-]*[a-z0-9]$
-                type: string
-                x-kubernetes-int-or-string: true
-              region:
-                pattern: (us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d
-                type: string
-                x-kubernetes-int-or-string: true
+              encryption:
+                default: false
+                type: boolean
               tags:
                 additionalProperties:
                   type: string
                 type: object
-            required:
-            - bucketName
-            - region
             type: object
           status:
             description: S3BucketStatus defines the observed state of S3Bucket
-            properties:
-              isReady:
-                type: boolean
-            required:
-            - isReady
             type: object
         type: object
     served: true

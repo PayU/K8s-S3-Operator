@@ -11,7 +11,7 @@ Requirements:
 * `controller-gen` > 0.4
 * `kustomize` >= 4.0
 * `docker`: latest version
-* lo
+* `golang` >= 1.17
 
 **Quick Start**
 

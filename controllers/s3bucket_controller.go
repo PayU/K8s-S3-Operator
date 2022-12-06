@@ -18,20 +18,23 @@ package controllers
 
 import (
 	"context"
+	"regexp"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
+	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
+
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // S3BucketReconciler reconciles a S3Bucket object
 type S3BucketReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	Log    logr.Logger
+	Scheme    *runtime.Scheme
+	Log       *logr.Logger
+	AwsClient *awsClient.AwsClient
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
@@ -48,16 +51,36 @@ type S3BucketReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	log := r.Log.WithValues("namespace", req.Namespace, "resource_name", req.Name)
 	var s3Bucket s3operatorv1.S3Bucket
-	if err := r.Get(context.Background(), req.NamespacedName, &s3Bucket); err != nil {
-		logger.Error(err,"error with geting s3 bucket")
-		return ctrl.Result{}, nil
+
+	errToGet := r.Get(context.TODO(), req.NamespacedName, &s3Bucket)
+	if errToGet != nil {
+		var err error
+		isDeleted := false
+		if CheckIfNotFoundError(req.Name, errToGet.Error()) { // check if resource not exists
+			isDeleted, err = r.AwsClient.HandleBucketDeletion(req.Name, &log)
+		} else { //unexpcted error
+			log.Error(errToGet, "unexpcted error in Get in Reconcile function")
+			err = errToGet
+		}
+
+		return ctrl.Result{Requeue: !isDeleted}, err
 	}
-
-	// TODO(user): your logic here
-
-	return ctrl.Result{Requeue: true}, nil
+	//succeded to get resource, check if need to create or update
+	isbucketExists, err := r.AwsClient.BucketExists(s3Bucket.Name, &log)
+	if err != nil {
+		return ctrl.Result{Requeue: true}, err
+	}
+	if isbucketExists {
+		_, err = r.AwsClient.HandleBucketUpdate(s3Bucket.Name, &s3Bucket.Spec, &log)
+	} else { //bucket not exists in aws, create
+		_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name, &log)
+	}
+	if err != nil {
+		return ctrl.Result{Requeue: true}, err
+	}
+	return ctrl.Result{Requeue: false}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -65,4 +88,11 @@ func (r *S3BucketReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&s3operatorv1.S3Bucket{}).
 		Complete(r)
+}
+
+func CheckIfNotFoundError(reqName string, errStr string) bool {
+	pattern := reqName + "\" not found"
+	match, _ := regexp.MatchString(pattern, errStr)
+	return match
+
 }

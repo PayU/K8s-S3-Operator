@@ -34,6 +34,8 @@ import (
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	"github.com/PayU/K8s-S3-Operator/controllers"
+	"github.com/PayU/K8s-S3-Operator/controllers/aws"
+	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -58,8 +60,9 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", true,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+
 	opts := zap.Options{
-		Development: true,
+		Development: config.DevMode(),
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -90,10 +93,15 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-
+	Logger := zap.New(zap.UseFlagOptions(&opts)).
+		WithName("controllers").
+		WithName("s3Operator")
+	
 	if err = (&controllers.S3BucketReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		AwsClient: aws.GetAwsClient(&Logger),
+		Log:       &Logger,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "S3Bucket")
 		os.Exit(1)

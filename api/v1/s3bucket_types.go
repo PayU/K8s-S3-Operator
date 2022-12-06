@@ -23,24 +23,16 @@ import (
 // S3BucketSpec defines the desired state of S3Bucket
 type S3BucketSpec struct {
 
-	// +kubebuilder:validation:MinLength:=3
-	// +kubebuilder:validation:MaxLength:=63
-	// +kubebuilder:validation:XIntOrString
-	// +kubebuilder:validation:Pattern:=^[a-z0-9][a-z0-9-]*[a-z0-9]$
-
-	BucketName string `json:"bucketName"`
-
-	// +kubebuilder:validation:XIntOrString
-	// +kubebuilder:validation:Pattern:=(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d
-	Region string `json:"region"`
-
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`
+
+	// +optional
+	// +kubebuilder:default:=false
+	Encryption bool `json:"encryption,omitempty"`
 }
 
 // S3BucketStatus defines the observed state of S3Bucket
 type S3BucketStatus struct {
-	IsReady bool `json:"isReady"`
 }
 
 //+kubebuilder:object:root=true
