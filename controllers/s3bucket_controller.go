@@ -53,26 +53,34 @@ type S3BucketReconciler struct {
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", req.Namespace, "resource_name", req.Name)
 	var s3Bucket s3operatorv1.S3Bucket
+
 	errToGet := r.Get(context.TODO(), req.NamespacedName, &s3Bucket)
 	if errToGet != nil {
+		var err error
+		isDeleted := false
 		if CheckIfNotFoundError(req.Name, errToGet.Error()) { // check if resource not exists
-			_, errDel := r.AwsClient.HandleBucketDeletion(req.Name, &log)
-			return ctrl.Result{Requeue: true}, errDel
+			isDeleted, err = r.AwsClient.HandleBucketDeletion(req.Name, &log)
 		} else { //unexpcted error
 			log.Error(errToGet, "unexpcted error in Get in Reconcile function")
-			return ctrl.Result{Requeue: true}, errToGet
+			err = errToGet
 		}
 
-	} else { //succeded to get resource, check if need to create or update
-		isbucketExists, err := r.AwsClient.BucketExists(s3Bucket.Name, &log)
-		if isbucketExists {
-			log.Info("going to update flow")
-			_, err = r.AwsClient.HandleBucketUpdate(s3Bucket.Name, &s3Bucket.Spec, &log)
-		} else { //bucket not exists in aws, create
-			_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name, &log)
-		}
+		return ctrl.Result{Requeue: !isDeleted}, err
+	}
+	//succeded to get resource, check if need to create or update
+	isbucketExists, err := r.AwsClient.BucketExists(s3Bucket.Name, &log)
+	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
+	if isbucketExists {
+		_, err = r.AwsClient.HandleBucketUpdate(s3Bucket.Name, &s3Bucket.Spec, &log)
+	} else { //bucket not exists in aws, create
+		_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name, &log)
+	}
+	if err != nil {
+		return ctrl.Result{Requeue: true}, err
+	}
+	return ctrl.Result{Requeue: false}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.

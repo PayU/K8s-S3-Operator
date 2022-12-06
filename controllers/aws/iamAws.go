@@ -15,8 +15,9 @@ type IamClient struct {
 	Log       *logr.Logger
 }
 
-func (c IamClient) CreateIamRole(roleName string, Tag *iam.Tag) (*iam.CreateRoleOutput, error) {
-	c.Log.Info("CreateIamRole function", "role_name", roleName)
+func (c IamClient) CreateIamRole(roleName string, Tag *iam.Tag, log *logr.Logger) (*iam.CreateRoleOutput, error) {
+	c.Log = log
+	c.Log.Info("Creating IAM role for s3 bucket", "role_name", roleName)
 	policy, err := json.Marshal(map[string]interface{}{
 		"Version": "2012-10-17",
 		"Statement": []map[string]interface{}{
@@ -42,12 +43,13 @@ func (c IamClient) CreateIamRole(roleName string, Tag *iam.Tag) (*iam.CreateRole
 	if err != nil {
 		c.Log.Error(err, "error in CreateIamRole in CreateRole", "role_name", roleName)
 	} else {
-		c.Log.Info("succeded to create iam role", "role_from_res", res.Role)
+		c.Log.Info("Create IAM for s3 bucket finished successfully", "role_from_res", res.Role)
 	}
 	return res, err
 }
 
-func (c IamClient) DeleteIamRole(roleName string) (*iam.DeleteRoleOutput, error) {
+func (c IamClient) DeleteIamRole(roleName string, log *logr.Logger) (*iam.DeleteRoleOutput, error) {
+	c.Log = log
 	c.Log.Info("DeleteIamRole function", "role_name", roleName)
 	input := iam.DeleteRoleInput{
 		RoleName: &roleName,
