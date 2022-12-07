@@ -100,7 +100,6 @@ func TestBucketUpdateTag(t *testing.T) {
 	time.Sleep(graceTime * time.Second)
 	tags,err = s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
 	g.Expect(err).NotTo(HaveOccurred())
-	t.Log(tags.TagSet)
 	g.Expect(len(tags.TagSet)).Should(Equal(2))
 
 }
