@@ -141,8 +141,16 @@ func TestDeleteBucketData(t *testing.T) {
 func TestDeleteBucket(t *testing.T) {
 	t.Log("TestDeleteBucket")
 	g := NewWithT(t)
-
-	err := k8sClient.Delete(context.Background(),&s3Bucket)
+	//check bucket exists
+	_, err := s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(bucketName)})
 	g.Expect(err).NotTo(HaveOccurred())
+	//delete bucket resource
+	err = k8sClient.Delete(context.Background(),&s3Bucket)
+	g.Expect(err).NotTo(HaveOccurred())
+	//check bucket not exists
+	time.Sleep(graceTime*time.Second)
+	_, err = s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(bucketName)})
+	g.Expect(err).To(HaveOccurred())
+
 
 }
