@@ -167,11 +167,17 @@ delete-local-cluster:
 kind-load-controller:
 	kind load docker-image $(IMG) --name $(CLUSTER_NAME)
 
-.PHONY:run-local-aws
+.PHONY: run-local-aws
 run-local-aws:
 	docker run --rm -it -p 4566:4566 -p 4510-4559:4510-4559 localstack/localstack
 
-.PHONY:run-local-aws-on-cluster
+.PHONY: run-local-aws-on-cluster
 run-local-aws-on-cluster:
 	helm repo add localstack-repo https://helm.localstack.cloud
 	helm upgrade --install localstack localstack-repo/localstack -n $(NAMESPACE)
+	echo "applying ingress controller kong"
+	kubectl apply -f ./hack/ingress.yaml -n $(NAMESPACE)
+
+.PHONY: deploy-ingress-controller
+deploy-ingress-controller:
+	$(shell ./hack/scripts/deploy-ingress.sh)

@@ -15,7 +15,10 @@ Requirements:
 
 **Quick Start**
 
-This script will create kind cluster, build image and deploy it and will run local aws on cluster ([localstack](https://github.com/localstack/localstack))
+This script will create kind cluster,
+     build image of the controller and deploy it,
+     deploy kong ingress controller
+     and will run local aws on cluster with ingress ([localstack](https://github.com/localstack/localstack))
 ```bash
 sh ./hack/scripts/runLocalEnv.sh # you might need to run this as sudo if a regular user can't use docker
 

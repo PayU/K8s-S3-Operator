@@ -365,7 +365,7 @@ func CreateSession(Log *logr.Logger) *session.Session {
 	return ses
 }
 
-func setS3Client(Log *logr.Logger, ses *session.Session) *s3.S3 {
+func SetS3Client(Log *logr.Logger, ses *session.Session) *s3.S3 {
 	Log.Info("create s3Client wit session", "session", *ses)
 	s3Client := s3.New(ses)
 	if s3Client == nil {
@@ -396,7 +396,7 @@ func setClients(Log *logr.Logger) (*s3.S3, *resourcegroupstaggingapi.ResourceGro
 		Log.Error(err, "error in create new session")
 	} else {
 		Log.Info("session", "ses", ses)
-		return setS3Client(Log, ses), setRGTAClient(Log, ses), setIamClient(Log, ses)
+		return SetS3Client(Log, ses), setRGTAClient(Log, ses), setIamClient(Log, ses)
 	}
 	return &s3.S3{}, &resourcegroupstaggingapi.ResourceGroupsTaggingAPI{}, &iam.IAM{}
 }
