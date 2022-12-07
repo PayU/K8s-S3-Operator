@@ -35,7 +35,8 @@ var s3Bucket s3operatorv1.S3Bucket
 var graceTime = time.Duration(5)
 
 func TestMain(m *testing.M) {
-	// run local env befor
+	// run local env script befor test
+
 	logger = zap.New(zap.UseFlagOptions(&zap.Options{})).
 		WithName("system_test").
 		WithValues("bucket_name", bucketName)
@@ -44,6 +45,15 @@ func TestMain(m *testing.M) {
 	s3Client = awsClient.SetS3Client(&logger, ses)
 	s3Client.Endpoint = "http://localhost:4566"
 
+	createK8SClient()
+
+	s3Bucket = s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: bucketName, Namespace: namespace}}
+	exitVal := m.Run()
+
+	os.Exit(exitVal)
+}
+
+func createK8SClient(){
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -59,12 +69,6 @@ func TestMain(m *testing.M) {
 	} else {
 		k8sClient = mgr.GetClient()
 	}
-
-
-	s3Bucket = s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: bucketName, Namespace: namespace}}
-	exitVal := m.Run()
-
-	os.Exit(exitVal)
 }
 
 func TestCreateBucket(t *testing.T) {
