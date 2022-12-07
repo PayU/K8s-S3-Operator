@@ -38,12 +38,9 @@ func TestMain(m *testing.M) {
 		WithName("system_test").
 		WithValues("bucket_name", bucketName)
 
-	os.Setenv("AWS_ENDPOINT", "http://localhost:80/")
-	os.Setenv("AWS_ACCESS_KEY_ID", "test")
-	os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
-
 	ses := awsClient.CreateSession(&logger)
 	s3Client = awsClient.SetS3Client(&logger, ses)
+	s3Client.Endpoint = "http://localhost:4566"
 
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -79,6 +76,27 @@ func TestCreateBucket(t *testing.T) {
 
 
 }
+func TestBucketUpdateTag(t *testing.T) {
+	t.Log("TestBucketUpdateTag")
+	g := NewWithT(t)
+
+	tags,err := s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
+	g.Expect(err).NotTo(HaveOccurred())
+	t.Log(tags.TagSet)
+
+	g.Expect(len(tags.TagSet)).Should(Equal(1))
+	s3Bucket.Spec.Tags = map[string]string{"testKey":"testValue"}
+	
+	err = k8sClient.Update(context.Background(),&s3Bucket)
+	g.Expect(err).NotTo(HaveOccurred())
+	time.Sleep(timeToCreateBucket * time.Second)
+	tags,err = s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
+	g.Expect(err).NotTo(HaveOccurred())
+	t.Log(tags.TagSet)
+	g.Expect(len(tags.TagSet)).Should(Equal(2))
+
+}
+
 func TestPutBucketData(t *testing.T) {
 	t.Log("TestPutBucketData")
 	g := NewWithT(t)

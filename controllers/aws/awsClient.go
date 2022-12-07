@@ -118,8 +118,8 @@ func (a *AwsClient) UpdateBucketTags(bucketName string, tagsToUpdate map[string]
 		a.Log.Error(err, "error from GetBucketTagging")
 		return false, err
 	}
-	diffTags := a.FindDiffTags(tagsToUpdate, taggingOut.TagSet)
-	if len(diffTags) > 0 {
+	isDiffTags, diffTags := a.FindIfDiffTags(tagsToUpdate, taggingOut.TagSet)
+	if isDiffTags {
 		_, err := a.s3Client.PutBucketTagging(&s3.PutBucketTaggingInput{Bucket: &bucketName, Tagging: &s3.Tagging{TagSet: diffTags}})
 		if err != nil {
 			a.Log.Error(err, "error from PutBucketTagging")
@@ -129,12 +129,11 @@ func (a *AwsClient) UpdateBucketTags(bucketName string, tagsToUpdate map[string]
 		}
 	}
 	return true, nil
-
 }
-func (a *AwsClient) FindDiffTags(tagsToUpdate map[string]string, tagsFromAws []*s3.Tag) []*s3.Tag {
+func (a *AwsClient) FindIfDiffTags(tagsToUpdate map[string]string, tagsFromAws []*s3.Tag) (bool, []*s3.Tag) {
 	a.Log.Info("FindDiffTags function")
-	var diffTags []*s3.Tag
 	mapTagsFromAws := make(map[string]struct{}, len(tagsFromAws))
+	isDiffTags := false
 	for _, tag := range tagsFromAws {
 		mapTagsFromAws[tag.String()] = struct{}{}
 	}
@@ -143,15 +142,14 @@ func (a *AwsClient) FindDiffTags(tagsToUpdate map[string]string, tagsFromAws []*
 		Tagval := val
 		tag := s3.Tag{Key: &Tagkey, Value: &Tagval}
 		if _, found := mapTagsFromAws[tag.String()]; !found {
-			diffTags = append(diffTags, &tag)
+			a.Log.Info("found tags to update", "tagsToUpdate", tag)
+			tagsFromAws = append(tagsFromAws, &tag)
+			isDiffTags = true
 		}
 	}
-	if len(diffTags) > 0 {
-		a.Log.Info("found tags to update", "tagsToUpdate", diffTags)
-	} else {
-		a.Log.Info("no tags to update")
-	}
-	return diffTags
+	a.Log.Info("no tags to update")
+
+	return isDiffTags, tagsFromAws
 }
 
 func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
