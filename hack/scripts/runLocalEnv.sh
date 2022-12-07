@@ -14,7 +14,7 @@ if [ "$current_context" = "kind-$CLUSTER_NAME" ]; then
     make deploy
 
     echo "deploy-ingress-controller"
-    make deploy-ingress-controller
+    ./deploy-ingress.sh
     
     echo "run local aws loacalstack on cluster"
     make run-local-aws-on-cluster
