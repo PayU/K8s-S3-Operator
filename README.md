@@ -28,7 +28,18 @@ sh ./hack/scripts/runLocalEnv.sh # you might need to run this as sudo if a regul
 
 Todo
 
-### Development using Tilt
+### **Run system tests**
+The tests run against your k8s cluster and your aws service.
+when running locally the tests will run against your local kind cluster and the [localstack](https://github.com/localstack/localstack) service that run on your cluster.
+
+run tests:
+
+    1. upload local env:
+       1.1.  sh ./hack/scripts/runLocalEnv.sh
+    2. run go test ./tests/systemTest/system_test.go
+
+
+### **Development using Tilt**
 
 The recommended development flow is based on [Tilt](https://tilt.dev/) - it is used for quick iteration on code running in live containers.
 Setup based on [official docs](https://docs.tilt.dev/example_go.html) can be found in the Tiltfile.

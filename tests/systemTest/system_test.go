@@ -3,7 +3,9 @@ package tests
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,7 +32,7 @@ var namespace = "k8s-s3-operator-system"
 var logger logr.Logger
 var k8sClient client.Client
 var s3Bucket s3operatorv1.S3Bucket
-var timeToCreateBucket = time.Duration(5)
+var graceTime = time.Duration(5)
 
 func TestMain(m *testing.M) {
 	// run local env befor
@@ -69,10 +71,12 @@ func TestCreateBucket(t *testing.T) {
 	t.Log("TestCreateBucket")
 	g := NewWithT(t)
 
-	
-	err := k8sClient.Create(context.Background(),&s3Bucket)
+	_, err := s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(bucketName)})
+	g.Expect(err).To(HaveOccurred())
+
+	err = k8sClient.Create(context.Background(),&s3Bucket)
 	g.Expect(err).NotTo(HaveOccurred())
-	time.Sleep(timeToCreateBucket * time.Second)
+	time.Sleep(graceTime * time.Second)
 
 
 }
@@ -89,7 +93,7 @@ func TestBucketUpdateTag(t *testing.T) {
 	
 	err = k8sClient.Update(context.Background(),&s3Bucket)
 	g.Expect(err).NotTo(HaveOccurred())
-	time.Sleep(timeToCreateBucket * time.Second)
+	time.Sleep(graceTime * time.Second)
 	tags,err = s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
 	g.Expect(err).NotTo(HaveOccurred())
 	t.Log(tags.TagSet)
@@ -114,6 +118,12 @@ func TestFetchBucketData(t *testing.T) {
 	res, err := s3Client.GetObject(&s3.GetObjectInput{Bucket: aws.String(bucketName), Key: aws.String("testKey")})
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(res).NotTo(BeNil())
+	//check that getting body of object
+	buf := new(strings.Builder)
+	io.Copy(buf,res.Body)
+	g.Expect(buf.String()).To(Equal("test body"))
+
+
 
 }
 func TestDeleteBucketData(t *testing.T) {
