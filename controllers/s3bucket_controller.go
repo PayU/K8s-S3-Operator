@@ -96,3 +96,6 @@ func CheckIfNotFoundError(reqName string, errStr string) bool {
 	return match
 
 }
+// func (r *S3BucketReconciler)HandleBucketCreation(s3Bucket *s3operatorv1.S3Bucket)error{
+	
+// }
