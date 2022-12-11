@@ -41,6 +41,8 @@ func TestMain(m *testing.M) {
 		WithName("system_test").
 		WithValues("bucket_name", bucketName)
 
+	logger.Info("start to run before test configuration")
+
 	ses := awsClient.CreateSession(&logger)
 	s3Client = awsClient.SetS3Client(&logger, ses)
 	s3Client.Endpoint = "http://localhost:4566"
@@ -49,11 +51,12 @@ func TestMain(m *testing.M) {
 
 	s3Bucket = s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: bucketName, Namespace: namespace}}
 	exitVal := m.Run()
+	logger.Info("finish to run all tests")
 
 	os.Exit(exitVal)
 }
 
-func createK8SClient(){
+func createK8SClient() {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -72,42 +75,55 @@ func createK8SClient(){
 }
 
 func TestCreateBucket(t *testing.T) {
-	t.Log("TestCreateBucket")
+	t.Log("start TestCreateBucket")
 	g := NewWithT(t)
-
+	t.Log("check bucket not exsits")
 	_, err := s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(bucketName)})
 	g.Expect(err).To(HaveOccurred())
 
-	err = k8sClient.Create(context.Background(),&s3Bucket)
+	t.Log("create new bucket resource", "bucket_name", bucketName)
+
+	err = k8sClient.Create(context.Background(), &s3Bucket)
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTime * time.Second)
 
+	t.Log("check bucket exsits")
+	_, err = s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(bucketName)})
+	g.Expect(err).NotTo(HaveOccurred())
+
+	t.Log("finish TestCreateBucket")
 
 }
 func TestBucketUpdateTag(t *testing.T) {
-	t.Log("TestBucketUpdateTag")
+	t.Log("start TestBucketUpdateTag")
 	g := NewWithT(t)
 
-	tags,err := s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
+	t.Log("get bucket tagging expect not to have error and the only tag is the default tag ")
+	tags, err := s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
 	g.Expect(err).NotTo(HaveOccurred())
-	t.Log(tags.TagSet)
-
+	t.Log("got tags from aws", tags.TagSet)
 	g.Expect(len(tags.TagSet)).Should(Equal(1))
-	s3Bucket.Spec.Tags = map[string]string{"testKey":"testValue"}
-	
-	err = k8sClient.Update(context.Background(),&s3Bucket)
+
+	t.Log("update bucket tags expect not to have error and to add the new tag")
+	s3Bucket.Spec.Tags = map[string]string{"testKey": "testValue"}
+	err = k8sClient.Update(context.Background(), &s3Bucket)
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTime * time.Second)
-	tags,err = s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
+	tags, err = s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
+	t.Log("got tags from aws", tags.TagSet)
+
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(len(tags.TagSet)).Should(Equal(2))
+
+	t.Log("finish TestBucketUpdateTag")
 
 }
 
 func TestPutBucketData(t *testing.T) {
-	t.Log("TestPutBucketData")
+	t.Log("start TestPutBucketData")
 	g := NewWithT(t)
 
+	t.Log("put data object in bucket expect not to have error")
 	_, err := s3Client.PutObject(&s3.PutObjectInput{Key: aws.String("testKey"),
 		Body:   bytes.NewReader([]byte("test body")),
 		Bucket: aws.String(bucketName)})
@@ -118,39 +134,46 @@ func TestFetchBucketData(t *testing.T) {
 	t.Log("TestFetchBucketData")
 	g := NewWithT(t)
 
+	t.Log("get data object with key:testKey expect not to have error")
 	res, err := s3Client.GetObject(&s3.GetObjectInput{Bucket: aws.String(bucketName), Key: aws.String("testKey")})
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(res).NotTo(BeNil())
 	//check that getting body of object
 	buf := new(strings.Builder)
-	io.Copy(buf,res.Body)
+	io.Copy(buf, res.Body)
 	g.Expect(buf.String()).To(Equal("test body"))
 
-
-
+	t.Log("finish TestPutBucketData")
 }
 func TestDeleteBucketData(t *testing.T) {
-	t.Log("TestDeleteBucketData")
+	t.Log("start TestDeleteBucketData")
 	g := NewWithT(t)
 
+	t.Log("delete data object with key:testKey expect not to have error")
 	_, err := s3Client.DeleteObject(&s3.DeleteObjectInput{Bucket: aws.String(bucketName), Key: aws.String("testKey")})
 	g.Expect(err).NotTo(HaveOccurred())
+
+	t.Log("finish TestDeleteBucketData")
 
 }
 
 func TestDeleteBucket(t *testing.T) {
-	t.Log("TestDeleteBucket")
+	t.Log("start TestDeleteBucket")
 	g := NewWithT(t)
-	//check bucket exists
+
+	t.Log("check bucket exsist expect not to have error", bucketName)
 	_, err := s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(bucketName)})
 	g.Expect(err).NotTo(HaveOccurred())
-	//delete bucket resource
-	err = k8sClient.Delete(context.Background(),&s3Bucket)
+
+	t.Log("delete bucket resource expect not to have error")
+	err = k8sClient.Delete(context.Background(), &s3Bucket)
 	g.Expect(err).NotTo(HaveOccurred())
-	//check bucket not exists
-	time.Sleep(graceTime*time.Second)
+	time.Sleep(graceTime * time.Second)
+
+	t.Log("check bucket exsist expect to get error", bucketName)
 	_, err = s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(bucketName)})
 	g.Expect(err).To(HaveOccurred())
 
+	t.Log("finish TestDeleteBucket")
 
 }
