@@ -55,7 +55,7 @@ type S3BucketReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("namespace", req.Namespace, "resource_name", req.Name)
+	log := r.Log.WithValues("namespace", req.Namespace, "bucket_name", req.Name)
 	var s3Bucket s3operatorv1.S3Bucket
 	// k := k8sutils.K8sClient{Client: r.Client,Log: &log}
 

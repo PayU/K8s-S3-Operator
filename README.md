@@ -29,15 +29,14 @@ sh ./hack/scripts/runLocalEnv.sh # you might need to run this as sudo if a regul
 Todo
 
 ### **Run system tests**
-The tests run against your k8s cluster and your aws service.
-when running locally the tests will run against your local kind cluster and the [localstack](https://github.com/localstack/localstack) service that run on your cluster.
+The tests run against your local kind cluster and the [localstack](https://github.com/localstack/localstack) service that run on your cluster.
 
 run tests:
-
+```bash
     1. upload local env:
        1.1.  sh ./hack/scripts/runLocalEnv.sh
-    2. run go test ./tests/systemTest/system_test.go
-
+    2. go test ./tests/systemTest/system_test.go -v # -v flag for log all tests as they are run
+```
 
 ### **Development using Tilt**
 
