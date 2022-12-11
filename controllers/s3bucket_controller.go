@@ -22,6 +22,8 @@ import (
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
+	"github.com/PayU/K8s-S3-Operator/controllers/k8sutils"
+
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +37,8 @@ type S3BucketReconciler struct {
 	Scheme    *runtime.Scheme
 	Log       *logr.Logger
 	AwsClient *awsClient.AwsClient
+	k8sClient *k8sutils.K8sClient
+
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
@@ -53,6 +57,7 @@ type S3BucketReconciler struct {
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", req.Namespace, "resource_name", req.Name)
 	var s3Bucket s3operatorv1.S3Bucket
+	// k := k8sutils.K8sClient{Client: r.Client,Log: &log}
 
 	errToGet := r.Get(context.TODO(), req.NamespacedName, &s3Bucket)
 	if errToGet != nil {
@@ -75,7 +80,7 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if isbucketExists {
 		_, err = r.AwsClient.HandleBucketUpdate(s3Bucket.Name, &s3Bucket.Spec, &log)
 	} else { //bucket not exists in aws, create
-		_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name, &log)
+		_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name, &log, req.Namespace)
 	}
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
@@ -96,6 +101,3 @@ func CheckIfNotFoundError(reqName string, errStr string) bool {
 	return match
 
 }
-// func (r *S3BucketReconciler)HandleBucketCreation(s3Bucket *s3operatorv1.S3Bucket)error{
-	
-// }

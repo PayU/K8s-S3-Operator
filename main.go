@@ -100,7 +100,7 @@ func main() {
 	if err = (&controllers.S3BucketReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
-		AwsClient: aws.GetAwsClient(&Logger),
+		AwsClient: aws.GetAwsClient(&Logger,mgr.GetClient()),
 		Log:       &Logger,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "S3Bucket")

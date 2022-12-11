@@ -9,11 +9,13 @@ import (
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	"github.com/PayU/K8s-S3-Operator/controllers/config"
+	k8sutils "github.com/PayU/K8s-S3-Operator/controllers/k8sUtils"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-logr/logr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
@@ -26,6 +28,7 @@ type AwsClient struct {
 	RGTAClient *resourcegroupstaggingapi.ResourceGroupsTaggingAPI
 	Log        *logr.Logger
 	iamClient  *IamClient
+	k8sClient  *k8sutils.K8sClient
 }
 
 func (a *AwsClient) BucketExists(name string, log *logr.Logger) (bool, error) {
@@ -54,7 +57,7 @@ func (a *AwsClient) validateBucketName(name string) (bool, error) {
 	return match, nil
 }
 
-func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, bucketName string, log *logr.Logger) (bool, error) {
+func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, bucketName string, log *logr.Logger, namespace string) (bool, error) {
 	a.Log = log
 	validName, err := a.validateBucketName(bucketName)
 	if !validName {
@@ -66,6 +69,9 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, 
 		a.Log.Error(err, "bucket allredy exsist")
 		return false, errors.New("bucket allredy exsist")
 	}
+	// create or update service account
+	a.k8sClient.HandleSACreate(bucketSpec.Serviceaccount, namespace, getRoleName(bucketName))
+
 	bucketInput := a.CreateBucketInput(bucketName, config.Region())
 	_, err = a.CreateBucket(*bucketInput)
 	if err != nil {
@@ -399,12 +405,13 @@ func setClients(Log *logr.Logger) (*s3.S3, *resourcegroupstaggingapi.ResourceGro
 	return &s3.S3{}, &resourcegroupstaggingapi.ResourceGroupsTaggingAPI{}, &iam.IAM{}
 }
 
-func GetAwsClient(logger *logr.Logger) *AwsClient {
+func GetAwsClient(logger *logr.Logger, c client.Client) *AwsClient {
 	s3Client, rgtaClient, iamClient := setClients(logger)
 	return &AwsClient{
 		s3Client:   s3Client,
 		Log:        logger,
 		RGTAClient: rgtaClient,
 		iamClient:  &IamClient{IamClient: iamClient, Log: logger},
+		k8sClient:  &k8sutils.K8sClient{Client: c, Log: logger},
 	}
 }
