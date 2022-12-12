@@ -15,7 +15,10 @@ Requirements:
 
 **Quick Start**
 
-This script will create kind cluster, build image and deploy it and will run local aws on cluster ([localstack](https://github.com/localstack/localstack))
+This script will create kind cluster,
+     build image of the controller and deploy it,
+     deploy kong ingress controller
+     and will run local aws on cluster with ingress ([localstack](https://github.com/localstack/localstack))
 ```bash
 sh ./hack/scripts/runLocalEnv.sh # you might need to run this as sudo if a regular user can't use docker
 
@@ -25,7 +28,17 @@ sh ./hack/scripts/runLocalEnv.sh # you might need to run this as sudo if a regul
 
 Todo
 
-### Development using Tilt
+### **Run system tests**
+The tests run against your local kind cluster and the [localstack](https://github.com/localstack/localstack) service that run on your cluster.
+
+run tests:
+```bash
+    1. upload local env:
+       1.1.  sh ./hack/scripts/runLocalEnv.sh
+    2. go test ./tests/systemTest/system_test.go -v # -v flag for log all tests as they are run
+```
+
+### **Development using Tilt**
 
 The recommended development flow is based on [Tilt](https://tilt.dev/) - it is used for quick iteration on code running in live containers.
 Setup based on [official docs](https://docs.tilt.dev/example_go.html) can be found in the Tiltfile.

@@ -112,14 +112,17 @@ func (a *AwsClient) HandleBucketUpdate(bucketName string, bucketSpec *s3operator
 }
 
 func (a *AwsClient) UpdateBucketTags(bucketName string, tagsToUpdate map[string]string) (bool, error) {
-	a.Log.Info("UpdateBucketTags function")
-	taggingOut, err := a.s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
+	a.Log.V(1).Info("UpdateBucketTags function")
+	if tagsToUpdate == nil {
+		tagsToUpdate = map[string]string{}
+	}
+	tagsFromAws, err := a.s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
 	if err != nil {
 		a.Log.Error(err, "error from GetBucketTagging")
 		return false, err
 	}
-	diffTags := a.FindDiffTags(tagsToUpdate, taggingOut.TagSet)
-	if len(diffTags) > 0 {
+	isDiffTags, diffTags := a.FindIfDiffTags(tagsToUpdate, tagsFromAws.TagSet)
+	if isDiffTags {
 		_, err := a.s3Client.PutBucketTagging(&s3.PutBucketTaggingInput{Bucket: &bucketName, Tagging: &s3.Tagging{TagSet: diffTags}})
 		if err != nil {
 			a.Log.Error(err, "error from PutBucketTagging")
@@ -127,35 +130,52 @@ func (a *AwsClient) UpdateBucketTags(bucketName string, tagsToUpdate map[string]
 			a.Log.Info("finish to update tags")
 
 		}
-	}
-	return true, nil
-
-}
-func (a *AwsClient) FindDiffTags(tagsToUpdate map[string]string, tagsFromAws []*s3.Tag) []*s3.Tag {
-	a.Log.Info("FindDiffTags function")
-	var diffTags []*s3.Tag
-	mapTagsFromAws := make(map[string]struct{}, len(tagsFromAws))
-	for _, tag := range tagsFromAws {
-		mapTagsFromAws[tag.String()] = struct{}{}
-	}
-	for key, val := range tagsToUpdate {
-		Tagkey := key
-		Tagval := val
-		tag := s3.Tag{Key: &Tagkey, Value: &Tagval}
-		if _, found := mapTagsFromAws[tag.String()]; !found {
-			diffTags = append(diffTags, &tag)
-		}
-	}
-	if len(diffTags) > 0 {
-		a.Log.Info("found tags to update", "tagsToUpdate", diffTags)
 	} else {
 		a.Log.Info("no tags to update")
 	}
-	return diffTags
+	return true, nil
+}
+func (a *AwsClient) FindIfDiffTags(tagsToUpdate map[string]string, tagsFromAws []*s3.Tag) (bool, []*s3.Tag) {
+	a.Log.V(1).Info("FindDiffTags function")
+	isDiffTags := false
+	newTags := []*s3.Tag{}
+	mapAwsTags := map[string]string{}
+
+	for _, tag := range tagsFromAws {
+		tagToCheck := *tag
+		mapAwsTags[*tag.Key] = *tag.Value
+		if len(*tagToCheck.Key) < len(config.TagPrefix()) || (*tagToCheck.Key)[:len(config.TagPrefix())] != config.TagPrefix() {
+			newTags = append(newTags, &tagToCheck) //add all tags that dont have the operator prefix
+			a.Log.Info("add tag from aws", "tag", tagToCheck)
+
+		} else { //all the tags from aws that have the Tag prefix
+			tagKeyWithoutPrefix := (*tagToCheck.Key)[:len(config.TagPrefix())]
+			val, ok := tagsToUpdate[tagKeyWithoutPrefix]
+			if !ok || val != *tagToCheck.Value {
+				isDiffTags = true
+				a.Log.Info("found tags to update", "tagsToUpdate", tagToCheck)
+			}
+		}
+	}
+	for key, val := range tagsToUpdate { //add all the tags from resource to the tags array
+		Tagkey := config.TagPrefix() + key
+		Tagval := val
+		tag := s3.Tag{Key: &Tagkey, Value: &Tagval}
+		a.Log.V(1).Info("add tag from spec", "tag", tag)
+		newTags = append(newTags, &tag)
+		val, ok := mapAwsTags[Tagkey]
+		if !ok || val != Tagval {
+			isDiffTags = true
+			a.Log.Info("found tags to update", "tagsToUpdate", tag)
+		}
+
+	}
+	a.Log.V(1).Info("returend from find diff Tags", "isDiffTags", isDiffTags, "newTags", newTags)
+	return isDiffTags, newTags
 }
 
 func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
-	a.Log.Info("Starting to create S3 bucket on AWS", "bucket_name", *bucketInput.Bucket, "region", *bucketInput.CreateBucketConfiguration.LocationConstraint)
+	a.Log.Info("Starting to create S3 bucket on AWS", "region", *bucketInput.CreateBucketConfiguration.LocationConstraint)
 	res, err := a.s3Client.CreateBucket(&bucketInput)
 	if err != nil { //  cast err to awserr.Error to get the Code and
 		if aerr, ok := err.(awserr.Error); ok {
@@ -172,11 +192,11 @@ func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBu
 			}
 		} else {
 			// Message from an error.
-			a.Log.Error(err, "error in creatBucket function", "bucket_name", *bucketInput.Bucket, "region", *bucketInput.CreateBucketConfiguration.LocationConstraint)
+			a.Log.Error(err, "error in creatBucket function", "region", *bucketInput.CreateBucketConfiguration.LocationConstraint)
 			return nil, err
 		}
 	}
-	a.Log.Info("S3 bucket creation finished successfully", "bucket_name", *bucketInput.Bucket, "region", *bucketInput.CreateBucketConfiguration.LocationConstraint)
+	a.Log.Info("S3 bucket creation finished successfully", "region", *bucketInput.CreateBucketConfiguration.LocationConstraint)
 	return res, nil
 
 }
@@ -184,7 +204,7 @@ func (a *AwsClient) CreateBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBu
 func (a *AwsClient) PutBucketTagging(bucketName string, bucketTags *map[string]string) (bool, error) {
 	tags := make([]*s3.Tag, 0)
 	for key, val := range *bucketTags {
-		Tagkey := key
+		Tagkey := config.TagPrefix() + key
 		Tagval := val
 		tag := s3.Tag{
 			Key:   &Tagkey,
@@ -198,13 +218,13 @@ func (a *AwsClient) PutBucketTagging(bucketName string, bucketTags *map[string]s
 		Bucket:  aws.String(bucketName),
 		Tagging: &s3.Tagging{TagSet: tags},
 	}
-	a.Log.Info("Adding Tags to s3 bucket", "bucket_name", *input.Bucket, "bucket_tags", *input.Tagging)
+	a.Log.Info("Adding Tags to s3 bucket", "bucket_tags", *input.Tagging)
 	_, err := a.s3Client.PutBucketTagging(input)
 	if err != nil {
-		a.Log.Error(err, "error PutBucketTagging", "bucket_name", *input.Bucket)
+		a.Log.Error(err, "error PutBucketTagging")
 		return false, err
 	}
-	a.Log.Info("S3 bucket tagging finished successfully", "bucket_name", *input.Bucket, "bucket_tags", *input.Tagging)
+	a.Log.Info("S3 bucket tagging finished successfully", "bucket_tags", *input.Tagging)
 	return true, nil
 }
 
@@ -217,26 +237,26 @@ func (a *AwsClient) CreateBucketInput(bucketName string, bucketRegion string) *s
 }
 
 func (a *AwsClient) DeleteBucket(bucketName string) (*s3.DeleteBucketOutput, error) {
-	a.Log.Info("DeleteBucket function", "bucket_name", bucketName)
+	a.Log.Info("DeleteBucket function")
 	res, err := a.s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
 	return res, err
 }
 func (a *AwsClient) CleanupsBucket(bucketName string) error {
-	a.Log.Info("CleanupsBucket function", "bucket_name", bucketName)
+	a.Log.Info("CleanupsBucket function")
 
 	iter := s3manager.NewDeleteListIterator(a.s3Client, &s3.ListObjectsInput{
 		Bucket: aws.String(bucketName),
 	})
 	if err := s3manager.NewBatchDeleteWithClient(a.s3Client).Delete(aws.BackgroundContext(), iter); err != nil {
-		a.Log.Error(err, "Unable to delete objects from bucket", "bucket_name", bucketName)
+		a.Log.Error(err, "Unable to delete objects from bucket")
 		return err
 	}
-	a.Log.Info("succeded to cleanup bucket", "bucket_name", bucketName)
+	a.Log.Info("succeded to cleanup bucket")
 	return nil
 }
 
 func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.PutBucketPolicyOutput, error) {
-	a.Log.Info("adding bucket policy for s3 bucket", "bucket_name", bucketName, "roleName:", roleName)
+	a.Log.Info("adding bucket policy for s3 bucket", "roleName:", roleName)
 
 	// Create a policy using map interface. Filling in the bucket as the
 	// resource.
@@ -261,7 +281,7 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 	}
 	bucketPolicy, err := json.Marshal(AllPremisionToRole)
 	if err != nil {
-		a.Log.Error(err, "error in PutBucketPolicy in Marshal", "bucket_name", bucketName, "roleName:", roleName)
+		a.Log.Error(err, "error in PutBucketPolicy in Marshal", "roleName:", roleName)
 		return nil, err
 
 	}
@@ -274,13 +294,13 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 	if err != nil {
 		a.Log.Error(err, "error in put bucket policy", bucketName, "policy:", *input.Policy)
 	} else {
-		a.Log.Info("Attach bucket policy to s3 bucket finished successfully", "bucket_name", bucketName, "policy:", *input.Policy)
+		a.Log.Info("Attach bucket policy to s3 bucket finished successfully", "policy:", *input.Policy)
 	}
 	return res, err
 }
 
 func (a *AwsClient) PutBucketEncrypt(bucketName string) (bool, error) {
-	a.Log.Info("PutBucketEncrypt function", "bucket_name", bucketName)
+	a.Log.Info("PutBucketEncrypt function")
 	encryptRules := []*s3.ServerSideEncryptionRule{{
 		BucketKeyEnabled:                   aws.Bool(true),
 		ApplyServerSideEncryptionByDefault: &s3.ServerSideEncryptionByDefault{SSEAlgorithm: aws.String("AES256")}},
@@ -293,25 +313,25 @@ func (a *AwsClient) PutBucketEncrypt(bucketName string) (bool, error) {
 		Bucket:                            &bucketName,
 		ServerSideEncryptionConfiguration: &sSEncryptConfiguration,
 	}
-	a.Log.Info("PutBucketEncryption input", "bucket_name", bucketName, "ServerSideEncryptionConfiguration:", *input.ServerSideEncryptionConfiguration)
+	a.Log.Info("PutBucketEncryption input", "ServerSideEncryptionConfiguration:", *input.ServerSideEncryptionConfiguration)
 	_, err := a.s3Client.PutBucketEncryption(input)
 	if err != nil {
 		a.Log.Error(err, "not succsede to PutBucketEncrypt")
 		return false, err
 	}
-	a.Log.Info("succeded to encrypt bucket", "bucket_name", bucketName)
+	a.Log.Info("succeded to encrypt bucket")
 	return true, nil
 
 }
 
 func (a *AwsClient) DeleteBucketPolicy(bucketName string) (*s3.DeleteBucketPolicyOutput, error) {
-	a.Log.Info("DeleteBucketPolicy function", "bucket_name", bucketName)
+	a.Log.Info("DeleteBucketPolicy function")
 	input := &s3.DeleteBucketPolicyInput{
 		Bucket: &bucketName,
 	}
 	res, err := a.s3Client.DeleteBucketPolicy(input)
 	if err != nil {
-		a.Log.Error(err, "error in DeleteBucketPolicy", "bucket_name", bucketName)
+		a.Log.Error(err, "error in DeleteBucketPolicy")
 	}
 	return res, err
 }
@@ -340,10 +360,6 @@ func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) ([]*string, error) {
 	}
 	return buckets, nil
 }
-func (a *AwsClient) LogWithVal(bucketName string) *logr.Logger {
-	logger := a.Log.WithValues("bucket_name", bucketName)
-	return &logger
-}
 
 func getRoleName(bucketName string) string {
 	roleName := bucketName + "IAM-ROLE-S3Operator"
@@ -365,7 +381,7 @@ func CreateSession(Log *logr.Logger) *session.Session {
 	return ses
 }
 
-func setS3Client(Log *logr.Logger, ses *session.Session) *s3.S3 {
+func SetS3Client(Log *logr.Logger, ses *session.Session) *s3.S3 {
 	Log.Info("create s3Client wit session", "session", *ses)
 	s3Client := s3.New(ses)
 	if s3Client == nil {
@@ -396,7 +412,7 @@ func setClients(Log *logr.Logger) (*s3.S3, *resourcegroupstaggingapi.ResourceGro
 		Log.Error(err, "error in create new session")
 	} else {
 		Log.Info("session", "ses", ses)
-		return setS3Client(Log, ses), setRGTAClient(Log, ses), setIamClient(Log, ses)
+		return SetS3Client(Log, ses), setRGTAClient(Log, ses), setIamClient(Log, ses)
 	}
 	return &s3.S3{}, &resourcegroupstaggingapi.ResourceGroupsTaggingAPI{}, &iam.IAM{}
 }

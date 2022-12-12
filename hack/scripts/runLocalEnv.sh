@@ -12,9 +12,13 @@ if [ "$current_context" = "kind-$CLUSTER_NAME" ]; then
     make kind-load-controller
     echo "deploy operator"
     make deploy
+
+    echo "deploy-ingress-controller"
+    sh ./hack/scripts/deploy-ingress.sh
     
     echo "run local aws loacalstack on cluster"
     make run-local-aws-on-cluster
+
 else
   echo "Please set the current cluster context to kind-$CLUSTER_NAME and re-run the install script"
 fi
