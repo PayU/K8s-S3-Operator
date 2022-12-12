@@ -21,6 +21,7 @@ type K8sClient struct {
 
 // }
 func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, iamRole string) error {
+	k.Log.Info("starting handle create of service account", "SA_name",serviceAcountName,"namespace",namespace, "iam_role",iamRole)
 	//check if SA exsist
 	sa, err := k.GetServiceAccount(serviceAcountName, namespace)
 	if err != nil {
@@ -29,6 +30,7 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 	if sa == nil {
 		err = k.CreateServiceAccount(serviceAcountName, namespace, iamRole)
 	} else {
+		
 		err = k.EditServiceAccount(serviceAcountName, namespace, iamRole)
 	}
 	return err
@@ -84,6 +86,10 @@ func (k *K8sClient) EditServiceAccount(serviceAcountName string, namespace strin
 		return err
 	}
 	return nil
+}
+func (k *K8sClient)ValidateServiceAccount(sa *v1.ServiceAccount)bool{
+	//todo: insert validation code
+	return true
 }
 func CheckIfNotFoundError(reqName string, errStr string) bool {
 	pattern := reqName + "\" not found"

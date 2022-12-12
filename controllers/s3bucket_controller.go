@@ -22,7 +22,6 @@ import (
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
-	"github.com/PayU/K8s-S3-Operator/controllers/k8sutils"
 
 
 	"github.com/go-logr/logr"
@@ -37,7 +36,6 @@ type S3BucketReconciler struct {
 	Scheme    *runtime.Scheme
 	Log       *logr.Logger
 	AwsClient *awsClient.AwsClient
-	k8sClient *k8sutils.K8sClient
 
 }
 
@@ -57,7 +55,6 @@ type S3BucketReconciler struct {
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", req.Namespace, "bucket_name", req.Name)
 	var s3Bucket s3operatorv1.S3Bucket
-	// k := k8sutils.K8sClient{Client: r.Client,Log: &log}
 
 	errToGet := r.Get(context.TODO(), req.NamespacedName, &s3Bucket)
 	if errToGet != nil {

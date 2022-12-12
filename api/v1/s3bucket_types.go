@@ -29,7 +29,7 @@ type S3BucketSpec struct {
 
 	// +kubebuilder:validation:MinItems=1
 	Selector map[string]string `json:"selector,omitempty"`
-	
+
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`
 

@@ -17,6 +17,8 @@ rules:
   - configmaps
   - pods
   - services
+  - serviceaccounts
+  - secrets
   - leases
   verbs:
   - get
@@ -32,6 +34,8 @@ rules:
   - configmaps
   - pods
   - services
+  - serviceaccounts
+  - secrets
   - leases
   verbs:
   - get

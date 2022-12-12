@@ -11,7 +11,18 @@ require (
 	sigs.k8s.io/controller-runtime v0.13.0
 )
 
-require github.com/jmespath/go-jmespath v0.4.0 // indirect
+require (
+	github.com/gin-contrib/sse v0.1.0 // indirect
+	github.com/go-playground/locales v0.14.0 // indirect
+	github.com/go-playground/universal-translator v0.18.0 // indirect
+	github.com/go-playground/validator/v10 v10.10.0 // indirect
+	github.com/goccy/go-json v0.9.7 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/leodido/go-urn v1.2.1 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
+	github.com/ugorji/go/codec v1.2.7 // indirect
+)
 
 require (
 	cloud.google.com/go v0.97.0 // indirect
@@ -30,6 +41,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
+	github.com/gin-gonic/gin v1.8.1
 	github.com/go-logr/zapr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
