@@ -96,11 +96,11 @@ func main() {
 	Logger := zap.New(zap.UseFlagOptions(&opts)).
 		WithName("controllers").
 		WithName("s3Operator")
-	
+
 	if err = (&controllers.S3BucketReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
-		AwsClient: aws.GetAwsClient(&Logger,mgr.GetClient()),
+		AwsClient: aws.GetAwsClient(&Logger, mgr.GetClient()),
 		Log:       &Logger,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "S3Bucket")

@@ -70,7 +70,7 @@ func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, 
 		return false, errors.New("bucket allredy exsist")
 	}
 	// create or update service account
-	a.k8sClient.HandleSACreate(bucketSpec.Serviceaccount, namespace, getRoleName(bucketName))
+	a.k8sClient.HandleSACreate(bucketSpec.Serviceaccount, namespace, getRoleName(bucketName),bucketSpec.Selector)
 
 	bucketInput := a.CreateBucketInput(bucketName, config.Region())
 	_, err = a.CreateBucket(*bucketInput)

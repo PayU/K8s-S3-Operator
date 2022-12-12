@@ -23,7 +23,6 @@ import (
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
 
-
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,7 +35,6 @@ type S3BucketReconciler struct {
 	Scheme    *runtime.Scheme
 	Log       *logr.Logger
 	AwsClient *awsClient.AwsClient
-
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete

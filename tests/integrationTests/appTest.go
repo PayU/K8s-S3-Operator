@@ -11,14 +11,15 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 )
-type bucketObj struct{
-	Key string `json:"key"`
-	Body string `json"body"`
+
+type bucketObj struct {
+	Key  string `json:"key"`
+	Body string `json:"body"`
 }
 
 func main() {
 	router := gin.Default()
-	router.GET("/",health)
+	router.GET("/", health)
 	router.GET("/bucket/:bucket_name", getBucket)
 	router.GET("/bucket/:bucket_name/:obj_key", getObjFromBucket)
 	router.POST("/bucket/:bucket_name", addObjToBucket)
@@ -26,15 +27,15 @@ func main() {
 	router.Run("localhost:8080")
 
 }
-func health(c *gin.Context){
-	fmt.Println("health function")	
-	c.IndentedJSON(http.StatusOK,`{"health":"good"}`)
+func health(c *gin.Context) {
+	fmt.Println("health function")
+	c.IndentedJSON(http.StatusOK, `{"health":"good"}`)
 }
 func getBucket(c *gin.Context) {
-	fmt.Println("getBucket function")	
+	fmt.Println("getBucket function")
 	s3Client := s3.New(CreateSession())
 	bucketName := c.Params.ByName("bucket_name")
-	fmt.Println(bucketName)	
+	fmt.Println(bucketName)
 	res, err := s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: &bucketName})
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, err.Error())
@@ -56,13 +57,13 @@ func getObjFromBucket(c *gin.Context) {
 
 }
 
-func addObjToBucket(c *gin.Context){
+func addObjToBucket(c *gin.Context) {
 	s3Client := s3.New(CreateSession())
 	bucketName := c.Params.ByName("bucket_name")
 	var input bucketObj
 	if err := c.BindJSON(&input); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, err)
-	}else{
+	} else {
 		res, err := s3Client.PutObject(&s3.PutObjectInput{Bucket: &bucketName, Key: &input.Key, Body: bytes.NewReader([]byte(input.Body))})
 		if err != nil {
 			c.IndentedJSON(http.StatusInternalServerError, err.Error())
@@ -71,10 +72,7 @@ func addObjToBucket(c *gin.Context){
 		}
 	}
 
-
-
 }
-
 
 func CreateSession() *session.Session {
 	awsConfig := &aws.Config{
