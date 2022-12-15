@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"regexp"
+	"time"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
@@ -78,7 +79,7 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name, &log, req.Namespace)
 	}
 	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{Requeue: true, RequeueAfter: time.Duration(10*time.Second)}, err
 	}
 	return ctrl.Result{Requeue: false}, err
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"time"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
@@ -18,25 +19,36 @@ type K8sClient struct {
 	Log *logr.Logger
 }
 
-func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, iamRole string,s3Selector map[string]string) error {
+func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, iamRole string, s3Selector map[string]string) error {
 	k.Log.Info("starting handle create of service account", "SA_name", serviceAcountName, "namespace", namespace, "iam_role", iamRole)
 	//check if SA exsist
-	err := k.ValidateServiceAccount(serviceAcountName,s3Selector,namespace)
-	if err != nil{
-		return err
-	}
 	sa, err := k.GetServiceAccount(serviceAcountName, namespace)
 	if err != nil {
 		return err //unexpected error in get service account function
 	}
 	if sa == nil {
-		err = k.CreateServiceAccount(serviceAcountName, namespace, iamRole)
-	} else {
+		sa, err = k.CreateServiceAccount(serviceAcountName, namespace, iamRole)
+		if err == nil {
+			for i := 0; i < 5; i++ {
+				time.Sleep(time.Duration(i) * time.Second)
+				err = k.ValidateServiceAccount(serviceAcountName, s3Selector, namespace)
+				if err == nil {
+					k.Log.Info("service account is valid", "serviceAcountName", serviceAcountName)
+					break
+				}
+			}
+			if err != nil {
+				k.Log.Error(err, "error to validate service account")
+				k.DeleteServiceAccount(sa)
+			}
+		}
+		return err
 
+	} else {
+		//todo; insert validation befor edit
 		err = k.EditServiceAccount(serviceAcountName, namespace, iamRole)
 	}
 	return err
-
 }
 
 func (k *K8sClient) GetServiceAccount(serviceAcountName string, namespace string) (*v1.ServiceAccount, error) {
@@ -53,17 +65,17 @@ func (k *K8sClient) GetServiceAccount(serviceAcountName string, namespace string
 	return sa, nil
 }
 
-func (k *K8sClient) CreateServiceAccount(serviceAcountName string, namespace string, iamRole string) error {
+func (k *K8sClient) CreateServiceAccount(serviceAcountName string, namespace string, iamRole string) (*v1.ServiceAccount, error) {
 	sa := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAcountName,
 		Namespace:   namespace,
-		Annotations: map[string]string{"eks.amazonaws.com/role-arn": iamRole}}}
+		Annotations: map[string]string{"eks.amazonaws.com/role-arn": "arn:aws:iam:::role/" + iamRole}}}
 
 	err := k.Create(context.Background(), sa)
 	if err != nil {
 		k.Log.Error(err, "error in create service account resource")
-		return err
+		return nil, err
 	}
-	return nil
+	return sa, nil
 }
 
 func (k *K8sClient) EditServiceAccount(serviceAcountName string, namespace string, iamRole string) error {
@@ -82,7 +94,7 @@ func (k *K8sClient) EditServiceAccount(serviceAcountName string, namespace strin
 		return err
 	}
 
-	sa.Annotations["eks.amazonaws.com/role-arn"] = iamRole
+	sa.Annotations["eks.amazonaws.com/role-arn"] = "arn:aws:iam:::role/" + iamRole
 	err = k.Update(context.Background(), sa)
 	if err != nil {
 		k.Log.Error(err, "error in update service account resource")
@@ -99,6 +111,11 @@ func (k *K8sClient) ValidateServiceAccount(SAName string, labelsFromS3 map[strin
 		k.Log.Error(err, "error to list app pods", "labels", labelsFromS3)
 		return err
 	}
+	if len(appPods.Items) == 0 {
+		err = errors.New("no app match to labels")
+		k.Log.Error(err, "no app match to labels", "labels", labelsFromS3)
+		return err
+	}
 	for _, appPod := range appPods.Items {
 		if appPod.Spec.ServiceAccountName != SAName {
 			err = errors.New("app ServiceAccountName not match s3resource service account name")
@@ -106,8 +123,18 @@ func (k *K8sClient) ValidateServiceAccount(SAName string, labelsFromS3 map[strin
 			return err
 		}
 	}
+	k.Log.Info("service account is valid", "serviceaccount name", SAName)
 
 	return nil
+}
+
+func (k *K8sClient) DeleteServiceAccount(sa *v1.ServiceAccount) error {
+
+	err := k.Delete(context.Background(), sa)
+	if err != nil {
+		k.Log.Error(err, "error to delete service account", "serviceaccount name", sa.Name)
+	}
+	return err
 }
 
 func CheckIfNotFoundError(reqName string, errStr string) bool {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
+	utils "github.com/PayU/K8s-S3-Operator/tests/utils"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/go-logr/logr"
@@ -47,7 +48,7 @@ func TestMain(m *testing.M) {
 	s3Client = awsClient.SetS3Client(&logger, ses)
 	s3Client.Endpoint = "http://localhost:4566"
 
-	createK8SClient()
+	k8sClient = *utils.CreateK8SClient(logger)
 
 	s3Bucket = s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: bucketName, Namespace: namespace}}
 	exitVal := m.Run()
@@ -56,7 +57,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitVal)
 }
 
-func createK8SClient() {
+func CreateK8SClient() {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 

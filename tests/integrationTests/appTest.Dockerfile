@@ -1,7 +1,13 @@
-FROM golang:1.19 as builder
+FROM node:16-alpine
 
-ADD ./appTest.go ./
+RUN mkdir /app
+WORKDIR /app
 
-ENTRYPOINT [ "/appTest" ]
+COPY package*.json ./
 
-EXPOSE 8080
+RUN npm install
+
+EXPOSE 3000
+
+COPY index.js ./
+ENTRYPOINT [ "node", "index.js" ]

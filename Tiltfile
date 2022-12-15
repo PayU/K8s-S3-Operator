@@ -19,13 +19,13 @@ def generate():
 def binary():
     return "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/manager main.go"
 
-# Deploy CRD
-local_resource(
-    "CRD",
-    manifests() + "kustomize build config/crd | kubectl apply -f -",
-    deps=["api"],
-    ignore=["*/*/zz_generated.deepcopy.go"],
-)
+# # Deploy CRD
+# local_resource(
+#     "CRD",
+#     manifests() + "kustomize build config/crd | kubectl apply -f -",
+#     deps=["api"],
+#     ignore=["*/*/zz_generated.deepcopy.go"],
+# )
 
 # Deploy manager
 watch_file("./config/")
