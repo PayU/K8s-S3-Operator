@@ -74,7 +74,7 @@ func (k *K8sClient) GetServiceAccount(serviceAcountName string, namespace string
 func (k *K8sClient) CreateServiceAccount(serviceAcountName string, namespace string, iamRole string) (*v1.ServiceAccount, error) {
 	sa := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAcountName,
 		Namespace:   namespace,
-		Annotations: map[string]string{"eks.amazonaws.com/role-arn": "arn:aws:iam:::role/" + iamRole}}}
+		Annotations: map[string]string{"eks.amazonaws.com/role-arn":  iamRole}}}
 
 	err := k.Create(context.Background(), sa)
 	if err != nil {
@@ -92,7 +92,7 @@ func (k *K8sClient) EditServiceAccount(serviceAcountName string, namespace strin
 		return err
 	}
 	if val, found := sa.Annotations["eks.amazonaws.com/role-arn"]; found {
-		if val == iamRole {
+		if val ==  iamRole {
 			k.Log.Info("service account allready have this iam role", "iam_role", iamRole)
 			return nil
 		}
@@ -100,7 +100,7 @@ func (k *K8sClient) EditServiceAccount(serviceAcountName string, namespace strin
 		return err
 	}
 
-	sa.Annotations["eks.amazonaws.com/role-arn"] = "arn:aws:iam:::role/" + iamRole
+	sa.Annotations["eks.amazonaws.com/role-arn"] =  iamRole
 	err = k.Update(context.Background(), sa)
 	if err != nil {
 		k.Log.Error(err, "error in update service account resource")

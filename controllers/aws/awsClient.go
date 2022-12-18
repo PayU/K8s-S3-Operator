@@ -264,8 +264,8 @@ func (a *AwsClient) CleanupsBucket(bucketName string) error {
 	return nil
 }
 
-func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.PutBucketPolicyOutput, error) {
-	a.Log.Info("adding bucket policy for s3 bucket", "roleName:", roleName)
+func (a *AwsClient) PutBucketPolicy(bucketName string, iamRole string) (*s3.PutBucketPolicyOutput, error) {
+	a.Log.Info("adding bucket policy for s3 bucket", "iamRole:", iamRole)
 
 	// Create a policy using map interface. Filling in the bucket as the
 	// resource.
@@ -276,7 +276,7 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 				"Sid":    "AllPremisionToRole" + bucketName,
 				"Effect": "Allow",
 				"Principal": []string{
-					"AWS: arn:aws:iam:::role/" + roleName,
+					"AWS: " + iamRole,
 				},
 				"Action": []string{
 					"s3:*",
@@ -290,7 +290,7 @@ func (a *AwsClient) PutBucketPolicy(bucketName string, roleName string) (*s3.Put
 	}
 	bucketPolicy, err := json.Marshal(AllPremisionToRole)
 	if err != nil {
-		a.Log.Error(err, "error in PutBucketPolicy in Marshal", "roleName:", roleName)
+		a.Log.Error(err, "error in PutBucketPolicy in Marshal", "iamRole:", iamRole)
 		return nil, err
 
 	}
@@ -372,7 +372,8 @@ func (a *AwsClient) getAllBucketsByTag(filterTag *s3.Tag) ([]*string, error) {
 
 func getRoleName(bucketName string) string {
 	roleName := bucketName + "IAM-ROLE-S3Operator"
-	return roleName
+	iamRole := "arn:aws:iam:::role/" + roleName
+	return iamRole
 }
 
 func CreateSession(Log *logr.Logger) *session.Session {

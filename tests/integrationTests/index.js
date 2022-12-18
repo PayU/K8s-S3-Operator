@@ -5,18 +5,6 @@ import { fromTemporaryCredentials } from "@aws-sdk/credential-providers"
 
 const app = express()
 const port = 30000
-// var stsclient = new sts.STS()
-
-// assumeRoleResult = stsclient.assumeRole(role-arn, function (err, data){
-//     if (err) console.log(err, err.stack); // an error occurred
-//     else     console.log(data); 
-// });
-// tempCredentials = new SessionAWSCredentials(
-//    assumeRoleResult.AccessKeyId, 
-//    assumeRoleResult.SecretAccessKey, 
-//    assumeRoleResult.SessionToken);
-
-//"http://localstack.k8s-s3-operator-system:4566"
 const creds =  await fromTemporaryCredentials({params: {RoleArn: 'arn:aws:iam:::role/s3bucket-sample-app-testtIAM-ROLE-S3Operator'},
                                                 clientConfig: {region: 'eu-central-1'},
                                                 endpoint:"http://localstack.k8s-s3-operator-system:4566"})

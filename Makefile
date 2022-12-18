@@ -190,3 +190,7 @@ kind-load-app:
 build-test-app:
 	cd ./tests/integrationTests
 	docker build -t $(APP_IMG) -f ./appTest.Dockerfile . 
+
+.PHONY: deploy-empty-app
+deploy-empty-app:
+	kubectl apply -f ./hack/emptyApp.yaml -n $(NAMESPACE)

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: system-test-app
+  namespace: k8s-s3-operator-system
+spec:
+  selector:
+    matchLabels:
+      app: system-test-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: system-test-app
+    spec:
+      containers:
+      - name: system-test-app
+        image: nginx:1.14.2
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+      serviceAccountName: system-test-serviceaccount
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: system-test-serviceaccount
+  namespace: k8s-s3-operator-system
