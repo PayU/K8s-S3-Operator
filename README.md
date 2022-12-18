@@ -37,6 +37,19 @@ run tests:
        1.1.  sh ./hack/scripts/runLocalEnv.sh
     2. go test ./tests/systemTest/system_test.go -v # -v flag for log all tests as they are run
 ```
+### **Run integration test tests**
+The integretion tests test the functionality of integration between deploying/update app to deploying new s3bucket
+
+Prerequisites:
+
+1. local env runnig  
+
+run tests:
+```bash
+1. sh ./tests/integrationTests/testApp/uploadApp.sh
+2. go test ./tests/integrationTests/integration_test.go
+
+```
 
 ### **Development using Tilt**
 
