@@ -18,6 +18,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	. "github.com/onsi/gomega"
+
+	// "k8s.io/apimachinery/pkg/runtime"
+	// utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	// clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	// ctrl "sigs.k8s.io/controller-runtime"
 )
 
 /*integration test will test 3 flows.
@@ -38,28 +43,24 @@ const (
 	graceTime		   = time.Duration(10)
 )
 
+
 func TestMain(m *testing.M) {
 	logger = zap.New(zap.UseFlagOptions(&zap.Options{})).
 		WithName("integration_test").
 		WithValues("app_name", appName, "serviceAccount_name", serviceAccountName, "bucket_name", s3BucketName, "namespace", namespace)
 	pathKubectl = FindKubectlPath()
-	k8sClient = *utils.CreateK8SClient(logger)
+	k8sClient = utils.CreateK8SClient(logger)
 		
 	exitVal := m.Run()
 	logger.Info("finish to run all tests")
 
 	os.Exit(exitVal)
 }
-func TestCheck(t *testing.T) {
-	g := NewWithT(t)
-
-	sa := v1.ServiceAccount{}
-	err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: "localstack"}, &sa)
-	g.Expect(err).NotTo(HaveOccurred())
-}
 
 
 func TestFlow1(t *testing.T) {
+	t.Log("TestFlow1")
+
 	g := NewWithT(t)
 	t.Cleanup(Cleanup)
 	//validate app deploy, serviceaccount, s3bucket not exsist
@@ -81,13 +82,13 @@ func TestFlow2(t *testing.T) {
 	t.Cleanup(Cleanup)
 	g := NewWithT(t)
 	//deploy app with defult service account  s3bucket not exsist
-	err := K8sApply("./yamlFiles/testflow2-start")
+	err := K8sApply("./yamlFiles/tesflow2-start.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 	//validate begin status
 	time.Sleep(graceTime*time.Second)
 	validateResourceStatus(t,true,false,false)
 	// apply to k8s app deploy, serviceaccount, s3bucket
-	err = K8sApply("./yamlFiles/testflow2-update")
+	err = K8sApply("./yamlFiles/testflow2-update.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTime*time.Second)
 
@@ -101,13 +102,13 @@ func TestFlow3(t *testing.T) {
 	t.Cleanup(Cleanup)
 	g := NewWithT(t)
 	//deploy app with  service account,  s3bucket not exsist
-	err := K8sApply("./yamlFiles/testflow3-start")
+	err := K8sApply("./yamlFiles/testflow3-start.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 	//validate begin status
 	time.Sleep(graceTime*time.Second)
 	validateResourceStatus(t,true,true,false)
 	// apply to k8s app deploy, serviceaccount, s3bucket
-	err = K8sApply("./yamlFiles/testflow3-update")
+	err = K8sApply("./yamlFiles/testflow3-update.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTime*time.Second)
 
@@ -119,23 +120,25 @@ func TestFlow3(t *testing.T) {
 func validateResourceStatus(t *testing.T,expectDeploy bool, expectSA bool, expectBucket bool){
 	g := NewWithT(t)
 	deploy := appsv1.Deployment{}
-	err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: appName}, &deploy)
+	err := k8sClient.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: appName}, &deploy)
+	
 	if expectDeploy{
+		
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(deploy.Status.AvailableReplicas).Should(Equal(deploy.Spec.Replicas))
+		g.Expect(deploy.Status.AvailableReplicas).Should(Equal(*deploy.Spec.Replicas))
 	}else{
 		g.Expect(err).To(HaveOccurred())
 	}
 	
 	sa := v1.ServiceAccount{}
-	err = k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: appName}, &sa)
+	err = k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: serviceAccountName}, &sa)
 	if expectSA{
 		g.Expect(err).NotTo(HaveOccurred())
 	}else{
 		g.Expect(err).To(HaveOccurred())
 	}
 	s3Bucket := s3operatorv1.S3Bucket{}
-	err = k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: appName}, &s3Bucket)
+	err = k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: s3BucketName}, &s3Bucket)
 	if expectBucket{
 		g.Expect(err).NotTo(HaveOccurred())
 	}else{

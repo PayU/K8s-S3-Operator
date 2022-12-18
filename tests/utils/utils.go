@@ -10,11 +10,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func CreateK8SClient(logger logr.Logger) *client.Client {
+func CreateK8SClient(logger logr.Logger) client.Client {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(s3operatorv1.AddToScheme(scheme))
+
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,
@@ -26,7 +27,11 @@ func CreateK8SClient(logger logr.Logger) *client.Client {
 		return nil
 	} else {
 		logger.Info("succseded create k8sclient")
-		c := mgr.GetClient()
-		return &c
+		c,err := client.New(mgr.GetConfig(),client.Options{Scheme: scheme})
+		if err != nil{
+			logger.Error(err,"error to create new k8s client")
+			panic("error to create new k8s client")
+		}
+		return c
 	}
 }
