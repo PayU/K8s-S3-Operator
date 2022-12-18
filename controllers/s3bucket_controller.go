@@ -79,7 +79,7 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name, &log, req.Namespace)
 	}
 	if err != nil {
-		return ctrl.Result{Requeue: true, RequeueAfter: time.Duration(10*time.Second)}, err
+		return ctrl.Result{Requeue: true, RequeueAfter: time.Duration(10 * time.Second)}, err
 	}
 	return ctrl.Result{Requeue: false}, err
 }

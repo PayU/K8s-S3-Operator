@@ -18,7 +18,7 @@ var resourcePerPage int64 = 100
 var awsCredentialsChainVerboseErrors bool
 var awsS3ForcePathStyle bool
 var devMode bool
-var tagPrefix = "s3.operator/"
+var TAG_PREFIX = "s3.operator/"
 
 func init() {
 	var err error
@@ -94,5 +94,5 @@ func DevMode() bool {
 	return devMode
 }
 func TagPrefix() string {
-	return tagPrefix
+	return TAG_PREFIX
 }

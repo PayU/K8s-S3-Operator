@@ -49,7 +49,7 @@ func TestMain(m *testing.M) {
 	k8sClient = utils.CreateK8SClient(logger)
 
 	s3Bucket = s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: bucketName, Namespace: namespace},
-		Spec: s3operatorv1.S3BucketSpec{Serviceaccount: serviceAccountName, Selector: map[string]string{"app":appName}}}
+		Spec: s3operatorv1.S3BucketSpec{Serviceaccount: serviceAccountName, Selector: map[string]string{"app": appName}}}
 	exitVal := m.Run()
 	logger.Info("finish to run all tests")
 

@@ -32,7 +32,7 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 		if err == nil {
 			k.Log.Info("succseded to create new service account")
 			oneSecond := time.Duration(1) * time.Second
-			wait.ExponentialBackoff(wait.Backoff{Duration:oneSecond,Factor: 2, Steps: 5},func() (done bool, err error) {
+			wait.ExponentialBackoff(wait.Backoff{Duration: oneSecond, Factor: 2, Steps: 5}, func() (done bool, err error) {
 				err = k.ValidateServiceAccount(serviceAcountName, s3Selector, namespace)
 				return err == nil, nil
 			})
@@ -40,19 +40,19 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 				k.Log.Error(err, "error to validate service account")
 				k.DeleteServiceAccount(sa)
 			}
-		}else{
-			k.Log.Error(err,"error to create new service account")
+		} else {
+			k.Log.Error(err, "error to create new service account")
 		}
 		return err
 
 	} else {
-		err = k.ValidateServiceAccount(serviceAcountName,s3Selector,namespace)
-		if err!= nil{
-			k.Log.Error(err,"error service account is not valid")
-		}else{
+		err = k.ValidateServiceAccount(serviceAcountName, s3Selector, namespace)
+		if err != nil {
+			k.Log.Error(err, "error service account is not valid")
+		} else {
 			err = k.EditServiceAccount(serviceAcountName, namespace, iamRole)
 		}
-		
+
 	}
 	return err
 }
@@ -74,7 +74,7 @@ func (k *K8sClient) GetServiceAccount(serviceAcountName string, namespace string
 func (k *K8sClient) CreateServiceAccount(serviceAcountName string, namespace string, iamRole string) (*v1.ServiceAccount, error) {
 	sa := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAcountName,
 		Namespace:   namespace,
-		Annotations: map[string]string{"eks.amazonaws.com/role-arn":  iamRole}}}
+		Annotations: map[string]string{"eks.amazonaws.com/role-arn": iamRole}}}
 
 	err := k.Create(context.Background(), sa)
 	if err != nil {
@@ -92,7 +92,7 @@ func (k *K8sClient) EditServiceAccount(serviceAcountName string, namespace strin
 		return err
 	}
 	if val, found := sa.Annotations["eks.amazonaws.com/role-arn"]; found {
-		if val ==  iamRole {
+		if val == iamRole {
 			k.Log.Info("service account allready have this iam role", "iam_role", iamRole)
 			return nil
 		}
@@ -100,7 +100,7 @@ func (k *K8sClient) EditServiceAccount(serviceAcountName string, namespace strin
 		return err
 	}
 
-	sa.Annotations["eks.amazonaws.com/role-arn"] =  iamRole
+	sa.Annotations["eks.amazonaws.com/role-arn"] = iamRole
 	err = k.Update(context.Background(), sa)
 	if err != nil {
 		k.Log.Error(err, "error in update service account resource")

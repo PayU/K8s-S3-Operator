@@ -16,7 +16,6 @@ func CreateK8SClient(logger logr.Logger) client.Client {
 
 	utilruntime.Must(s3operatorv1.AddToScheme(scheme))
 
-
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,
 		Port:             9443,
@@ -27,9 +26,9 @@ func CreateK8SClient(logger logr.Logger) client.Client {
 		return nil
 	} else {
 		logger.Info("succseded create k8sclient")
-		c,err := client.New(mgr.GetConfig(),client.Options{Scheme: scheme})
-		if err != nil{
-			logger.Error(err,"error to create new k8s client")
+		c, err := client.New(mgr.GetConfig(), client.Options{Scheme: scheme})
+		if err != nil {
+			logger.Error(err, "error to create new k8s client")
 			panic("error to create new k8s client")
 		}
 		return c
