@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -29,24 +30,29 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 	if sa == nil {
 		sa, err = k.CreateServiceAccount(serviceAcountName, namespace, iamRole)
 		if err == nil {
-			for i := 0; i < 5; i++ {
-				time.Sleep(time.Duration(i) * time.Second)
+			k.Log.Info("succseded to create new service account")
+			oneSecond := time.Duration(1) * time.Second
+			wait.ExponentialBackoff(wait.Backoff{Duration:oneSecond,Factor: 2, Steps: 5},func() (done bool, err error) {
 				err = k.ValidateServiceAccount(serviceAcountName, s3Selector, namespace)
-				if err == nil {
-					k.Log.Info("service account is valid", "serviceAcountName", serviceAcountName)
-					break
-				}
-			}
+				return err == nil, nil
+			})
 			if err != nil {
 				k.Log.Error(err, "error to validate service account")
 				k.DeleteServiceAccount(sa)
 			}
+		}else{
+			k.Log.Error(err,"error to create new service account")
 		}
 		return err
 
 	} else {
-		//todo; insert validation befor edit
-		err = k.EditServiceAccount(serviceAcountName, namespace, iamRole)
+		err = k.ValidateServiceAccount(serviceAcountName,s3Selector,namespace)
+		if err!= nil{
+			k.Log.Error(err,"error service account is not valid")
+		}else{
+			err = k.EditServiceAccount(serviceAcountName, namespace, iamRole)
+		}
+		
 	}
 	return err
 }
