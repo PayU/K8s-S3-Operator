@@ -3,7 +3,10 @@ package k8sutils
 import (
 	"context"
 	"errors"
+	"io/ioutil"
+	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -13,6 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	auth "k8s.io/api/authentication/v1"
+
+
 )
 
 type K8sClient struct {
@@ -147,5 +153,66 @@ func CheckIfNotFoundError(reqName string, errStr string) bool {
 	pattern := reqName + "\" not found"
 	match, _ := regexp.MatchString(pattern, errStr)
 	return match
+
+}
+func (k *K8sClient) GetTokenFromSA(SAName string, namespace string) (string, error) {
+	secretName, err := k.GetSecretName(SAName, namespace)
+	if err != nil {
+		return "", err
+	}
+	secret := &v1.Secret{}
+	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: secretName}, secret)
+
+	if err != nil {
+		k.Log.Error(err, "error to get secret", "secret_name", secretName)
+		return "", err
+	}
+	token, ok := secret.Data["token"]
+	if !ok {
+		k.Log.Error(errors.New("no token field in secret"), "no token field in secret")
+		return "", err
+	}
+	return string(token), nil
+}
+
+func (k *K8sClient) GetSecretName(SAName string, namespace string) (string, error) {
+	sa, err := k.GetServiceAccount(SAName, namespace)
+	if err != nil {
+		k.Log.Error(err, "error to get service account")
+		return "", err
+	}
+	var secretName string
+	for _, secretRef := range sa.Secrets {
+		if secretRef.Name != "" {
+			secretName = secretRef.Name
+			break
+		}
+	}
+
+	if secretName == "" {
+		err = errors.New("error finding secret for service account")
+		k.Log.Error(err, "error finding secret for service account")
+		return "", err
+	}
+	return secretName, nil
+}
+func (k *K8sClient) Add_SA_to_AC(SAName string, namespace string)error{
+	httpClient := http.Client{}
+	body := strings.NewReader("body")
+	req, err := http.NewRequest("POST", "url_to_AC",body)
+	if err != nil {
+		k.Log.Error(err,"error create request")
+		return err
+	}
+	req.Header.Add("token","token")
+	res, err := httpClient.Do(req)
+	if err != nil {
+		k.Log.Error(err,"error to post request")
+		return err
+	} 
+	defer res.Body.Close()
+	resBody ,_ :=ioutil.ReadAll(res.Body)
+	k.Log.Info("succeded to add to AC", "res body", string(resBody))
+	return nil
 
 }
