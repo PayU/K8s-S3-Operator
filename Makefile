@@ -6,7 +6,7 @@ ENVTEST_K8S_VERSION = 1.20.
 
 CLUSTER_NAME = s3operator-cluster
 NAMESPACE = k8s-s3-operator-system
-APP_IMG = apptest:new
+INTEGRATION_TESTS_APP_IMG = apptest:new
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -182,15 +182,15 @@ run-local-aws-on-cluster:
 deploy-ingress-controller:
 	$(shell ./hack/scripts/deploy-ingress.sh)
 
-.PHONY: kind-load-app
-kind-load-app:
-	kind load docker-image $(APP_IMG) --name $(CLUSTER_NAME)
+.PHONY: kind-load-integration-tests-app
+kind-load-integration-tests-app:
+	kind load docker-image $(INTEGRATION_TESTS_APP_IMG) --name $(CLUSTER_NAME)
 
-.PHONY: build-test-app
-build-test-app:
+.PHONY: build-integration-tests-app
+build-integration-tests-app:
 	cd ./tests/integrationTests
-	docker build -t $(APP_IMG) -f ./appTest.Dockerfile . 
+	docker build -t $(INTEGRATION_TESTS_APP_IMG) -f ./appTest.Dockerfile . 
 
-.PHONY: deploy-empty-app
-deploy-empty-app:
+.PHONY: deploy-system-test-app
+deploy-system-test-app:
 	kubectl apply -f ./hack/emptyApp.yaml -n $(NAMESPACE)

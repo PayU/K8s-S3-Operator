@@ -1,4 +1,4 @@
-package k8sutils
+package k8s
 
 import (
 	"context"
@@ -21,7 +21,7 @@ type K8sClient struct {
 }
 
 func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, iamRole string, s3Selector map[string]string) error {
-	k.Log.Info("starting handle create of service account", "SA_name", serviceAcountName, "namespace", namespace, "iam_role", iamRole)
+	k.Log.Info("starting to handle service account creation", "SA_name", serviceAcountName, "namespace", namespace, "iam_role", iamRole)
 	//check if SA exsist
 	sa, err := k.getServiceAccount(serviceAcountName, namespace)
 	if err != nil {

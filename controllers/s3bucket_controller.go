@@ -23,7 +23,7 @@ import (
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
-	k8sutils "github.com/PayU/K8s-S3-Operator/controllers/k8sUtils"
+	k8s "github.com/PayU/K8s-S3-Operator/controllers/k8s"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +37,7 @@ type S3BucketReconciler struct {
 	Scheme    *runtime.Scheme
 	Log       *logr.Logger
 	AwsClient *awsClient.AwsClient
-	K8sClient *k8sutils.K8sClient
+	K8sClient *k8s.K8sClient
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
@@ -62,7 +62,7 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if errToGet != nil {
 		var err error
 		isDeleted := false
-		if k8sutils.CheckIfNotFoundError(req.Name, errToGet.Error()) { // check if resource not exists
+		if k8s.CheckIfNotFoundError(req.Name, errToGet.Error()) { // check if resource not exists
 			isDeleted, err = r.handleDeleteFlow(&s3Bucket.Spec, req.Name, req.Namespace)
 		} else { //unexpcted error
 			log.Error(errToGet, "unexpcted error in Get in Reconcile function")
