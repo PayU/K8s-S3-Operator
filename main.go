@@ -36,6 +36,7 @@ import (
 	"github.com/PayU/K8s-S3-Operator/controllers"
 	"github.com/PayU/K8s-S3-Operator/controllers/aws"
 	"github.com/PayU/K8s-S3-Operator/controllers/config"
+	k8sutils "github.com/PayU/K8s-S3-Operator/controllers/k8sUtils"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -96,12 +97,13 @@ func main() {
 	Logger := zap.New(zap.UseFlagOptions(&opts)).
 		WithName("controllers").
 		WithName("s3Operator")
-
+		
 	if err = (&controllers.S3BucketReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
 		AwsClient: aws.GetAwsClient(&Logger, mgr.GetClient()),
 		Log:       &Logger,
+		K8sClient: &k8sutils.K8sClient{Client: mgr.GetClient(), Log: &Logger},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "S3Bucket")
 		os.Exit(1)

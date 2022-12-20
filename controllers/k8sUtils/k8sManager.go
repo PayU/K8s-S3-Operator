@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"regexp"
-	"time"
 
+	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,22 +23,21 @@ type K8sClient struct {
 func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, iamRole string, s3Selector map[string]string) error {
 	k.Log.Info("starting handle create of service account", "SA_name", serviceAcountName, "namespace", namespace, "iam_role", iamRole)
 	//check if SA exsist
-	sa, err := k.GetServiceAccount(serviceAcountName, namespace)
+	sa, err := k.getServiceAccount(serviceAcountName, namespace)
 	if err != nil {
 		return err //unexpected error in get service account function
 	}
 	if sa == nil {
-		sa, err = k.CreateServiceAccount(serviceAcountName, namespace, iamRole)
+		sa, err = k.createServiceAccount(serviceAcountName, namespace, iamRole)
 		if err == nil {
 			k.Log.Info("succseded to create new service account")
-			oneSecond := time.Duration(1) * time.Second
-			wait.ExponentialBackoff(wait.Backoff{Duration: oneSecond, Factor: 2, Steps: 5}, func() (done bool, err error) {
-				err = k.ValidateServiceAccount(serviceAcountName, s3Selector, namespace)
+			wait.ExponentialBackoff(wait.Backoff{Duration: config.WaitBackoffDuration(), Factor: config.WaitBackoffFactor(), Steps: config.WaitBackoffSteps()}, func() (done bool, err error) {
+				err = k.checkMatchingAppToServiceAccount(serviceAcountName, s3Selector, namespace)
 				return err == nil, nil
 			})
 			if err != nil {
-				k.Log.Error(err, "error to validate service account")
-				k.DeleteServiceAccount(sa)
+				k.Log.Error(err, "error service account is not match to app")
+				k.deleteServiceAccount(sa)
 			}
 		} else {
 			k.Log.Error(err, "error to create new service account")
@@ -46,18 +45,18 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 		return err
 
 	} else {
-		err = k.ValidateServiceAccount(serviceAcountName, s3Selector, namespace)
+		err = k.checkMatchingAppToServiceAccount(serviceAcountName, s3Selector, namespace)
 		if err != nil {
-			k.Log.Error(err, "error service account is not valid")
+			k.Log.Error(err, "error service account is not match to app")
 		} else {
-			err = k.EditServiceAccount(serviceAcountName, namespace, iamRole)
+			err = k.editServiceAccount(serviceAcountName, namespace, iamRole)
 		}
 
 	}
 	return err
 }
 
-func (k *K8sClient) GetServiceAccount(serviceAcountName string, namespace string) (*v1.ServiceAccount, error) {
+func (k *K8sClient) getServiceAccount(serviceAcountName string, namespace string) (*v1.ServiceAccount, error) {
 	sa := &v1.ServiceAccount{}
 	err := k.Client.Get(context.Background(), types.NamespacedName{Name: serviceAcountName, Namespace: namespace}, sa)
 	if err != nil {
@@ -71,7 +70,7 @@ func (k *K8sClient) GetServiceAccount(serviceAcountName string, namespace string
 	return sa, nil
 }
 
-func (k *K8sClient) CreateServiceAccount(serviceAcountName string, namespace string, iamRole string) (*v1.ServiceAccount, error) {
+func (k *K8sClient) createServiceAccount(serviceAcountName string, namespace string, iamRole string) (*v1.ServiceAccount, error) {
 	sa := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAcountName,
 		Namespace:   namespace,
 		Annotations: map[string]string{"eks.amazonaws.com/role-arn": iamRole}}}
@@ -84,7 +83,7 @@ func (k *K8sClient) CreateServiceAccount(serviceAcountName string, namespace str
 	return sa, nil
 }
 
-func (k *K8sClient) EditServiceAccount(serviceAcountName string, namespace string, iamRole string) error {
+func (k *K8sClient) editServiceAccount(serviceAcountName string, namespace string, iamRole string) error {
 	sa := &v1.ServiceAccount{}
 	err := k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: serviceAcountName}, sa)
 	if err != nil {
@@ -109,7 +108,7 @@ func (k *K8sClient) EditServiceAccount(serviceAcountName string, namespace strin
 	return nil
 }
 
-func (k *K8sClient) ValidateServiceAccount(SAName string, labelsFromS3 map[string]string, namespace string) error {
+func (k *K8sClient) checkMatchingAppToServiceAccount(SAName string, labelsFromS3 map[string]string, namespace string) error {
 	appPods := v1.PodList{}
 	//get all pods in namespace that match the labels
 	err := k.List(context.Background(), &appPods, &client.ListOptions{Namespace: namespace, LabelSelector: labels.SelectorFromSet(labelsFromS3)})
@@ -129,12 +128,12 @@ func (k *K8sClient) ValidateServiceAccount(SAName string, labelsFromS3 map[strin
 			return err
 		}
 	}
-	k.Log.Info("service account is valid", "serviceaccount name", SAName)
+	k.Log.Info("service account is match to app", "serviceaccount name", SAName, "labels", labelsFromS3)
 
 	return nil
 }
 
-func (k *K8sClient) DeleteServiceAccount(sa *v1.ServiceAccount) error {
+func (k *K8sClient) deleteServiceAccount(sa *v1.ServiceAccount) error {
 
 	err := k.Delete(context.Background(), sa)
 	if err != nil {
