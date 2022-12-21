@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
@@ -74,7 +73,7 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{Requeue: !isDeleted}, err
 	}
 	//succeded to get resource, check if need to create or update
-	isbucketExists, err := r.AwsClient.BucketExists(s3Bucket.Name)
+	isbucketExists, err := r.AwsClient.IsBucketExists(s3Bucket.Name)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
@@ -101,11 +100,6 @@ func (r *S3BucketReconciler) handleCreationFlow(bucketSpec *s3operatorv1.S3Bucke
 	if err != nil {
 		r.Log.Error(err, "bucket name is unvalid")
 		return err
-	}
-	BucketExist, err := r.AwsClient.BucketExists(bucketName)
-	if BucketExist {
-		r.Log.Error(err, "bucket allredy exsist")
-		return errors.New("bucket allredy exsist")
 	}
 	// create or update service account
 	err = r.K8sClient.HandleSACreate(bucketSpec.Serviceaccount, namespace, awsClient.GetRoleName(bucketName), bucketSpec.Selector)
