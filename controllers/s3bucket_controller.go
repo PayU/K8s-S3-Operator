@@ -41,6 +41,8 @@ type S3BucketReconciler struct {
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=serviceaccounts;pods,verbs=get;list;watch;create;update;patch;delete
+
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets/finalizers,verbs=update
 
@@ -124,7 +126,7 @@ func (r *S3BucketReconciler) handleUpdateFlow(bucketSpec *s3operatorv1.S3BucketS
 	return err
 }
 
-func (r *S3BucketReconciler) handleDeleteFlow(bucketSpec *s3operatorv1.S3BucketSpec, bucketName string, namespace string) (bool,error) {
-	 isDelted, err := r.AwsClient.HandleBucketDeletion(bucketName)
-	 return isDelted, err
+func (r *S3BucketReconciler) handleDeleteFlow(bucketSpec *s3operatorv1.S3BucketSpec, bucketName string, namespace string) (bool, error) {
+	isDelted, err := r.AwsClient.HandleBucketDeletion(bucketName)
+	return isDelted, err
 }
