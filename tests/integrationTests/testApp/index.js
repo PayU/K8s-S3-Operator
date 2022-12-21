@@ -1,13 +1,17 @@
 import AWS from '@aws-sdk/client-s3'
 import express from 'express'
-import sts from "@aws-sdk/client-sts"
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers"
+import k8s from '@kubernetes/client-node'
+
 
 const app = express()
 const port = 30000
-const creds =  await fromTemporaryCredentials({params: {RoleArn: 'arn:aws:iam:::role/s3bucket-sample-app-testtIAM-ROLE-S3Operator'},
-                                                clientConfig: {region: 'eu-central-1'},
-                                                endpoint:"http://localstack.k8s-s3-operator-system:4566"})
+const NAMESPACE = "k8s-s3-operator-system"
+const SERVICE_ACCOUNT_NAME = "k8s-s3-operator-controller-manager"
+const PREFIX_NAME = "system:serviceaccounts"
+// const creds =  await fromTemporaryCredentials({params: {RoleArn: 'arn:aws:iam:::role/s3bucket-sample-app-testtIAM-ROLE-S3Operator'},
+//                                                 clientConfig: {region: 'eu-central-1'},
+//                                                 endpoint:"http://localstack.k8s-s3-operator-system:4566"})
 var s3 = new AWS.S3({
     endpoint: "http://localstack.k8s-s3-operator-system:4566" ,
     region:'eu-central-1',
@@ -17,6 +21,11 @@ var s3 = new AWS.S3({
     credentials: creds
     
 })
+const kc = new k8s.KubeConfig();
+kc.loadFromDefault()
+const k8sApi = kc.makeApiClient(k8s.AuthenticationV1Api);
+
+
 
 
 
@@ -65,15 +74,63 @@ app.post('/bucket/:bucket_name', (req,res)=>{
     })
 })
 
+app.post('/createSA',async (req,res)  =>{
+    console.log("create service account function")
+    var token
+    try{
+        token = req.headers.token
+    }catch(e){
+        console.log("no token in header")
+        res.status(400).send("bad request")
+    }
+    const body = {
+        apiVersion: 'authentication.k8s.io/v1',
+        kind: 'TokenReview',
+        spec: {
+          token: req.headers.token
+        }
+      };
+ 
+   k8sApi.createTokenReview(body).then((k8sRes)=>{
+    console.log(`response from k8s api server ${k8sRes.body}`)
+    if (k8sRes.body.status.error){
+        res.status(403).send(k8sRes.body)
+    }else{
+        res.status(200).send(k8sRes.body)
+    }
+    
+   })
 
-
-
-
-
-
-
+})
 
 
   app.listen(port,()=>{
     console.log(`test app listening on port ${port}`)
   })
+  function validateResFromTokenReview(res){
+    var msg = "is valid"
+    validateGroups(res.status.groups,res.status.groups)
+    validateUserName(res.status.username)
+    validateUid(res.status.uid)
+    return [true,msg]
+
+  }
+  function validateGroups(groups,groupsToValid){
+    if(groups.length === groupsToValid){
+        return groups.every(element =>{
+            if (groupsToValid.includes(element)){
+                return true
+            }
+            return false
+        })
+    }
+    return false
+
+  }
+  function validateUserName(username){
+    return username === PREFIX_NAME + ':' + NAMESPACE + ':' + SERVICE_ACCOUNT_NAME
+
+  }
+  function validateUid(uid){
+
+  }

@@ -15,7 +15,7 @@ type IamClient struct {
 	Log       *logr.Logger
 }
 
-func (c IamClient) CreateIamRole(roleName string, Tag *iam.Tag, log *logr.Logger) (*iam.CreateRoleOutput, error) {
+func (c IamClient) createIamRole(roleName string, Tag *iam.Tag, log *logr.Logger) (*iam.CreateRoleOutput, error) {
 	c.Log = log
 	c.Log.Info("Creating IAM role for s3 bucket", "role_name", roleName)
 	policy, err := json.Marshal(map[string]interface{}{
@@ -48,7 +48,7 @@ func (c IamClient) CreateIamRole(roleName string, Tag *iam.Tag, log *logr.Logger
 	return res, err
 }
 
-func (c IamClient) DeleteIamRole(roleName string, log *logr.Logger) (*iam.DeleteRoleOutput, error) {
+func (c IamClient) deleteIamRole(roleName string, log *logr.Logger) (*iam.DeleteRoleOutput, error) {
 	c.Log = log
 	c.Log.Info("DeleteIamRole function", "role_name", roleName)
 	input := iam.DeleteRoleInput{

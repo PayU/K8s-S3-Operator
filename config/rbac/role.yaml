@@ -8,8 +8,8 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccounts
   - pods
+  - serviceaccounts
   verbs:
   - create
   - delete

@@ -36,6 +36,7 @@ import (
 	"github.com/PayU/K8s-S3-Operator/controllers"
 	"github.com/PayU/K8s-S3-Operator/controllers/aws"
 	"github.com/PayU/K8s-S3-Operator/controllers/config"
+	k8s "github.com/PayU/K8s-S3-Operator/controllers/k8s"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -102,6 +103,7 @@ func main() {
 		Scheme:    mgr.GetScheme(),
 		AwsClient: aws.GetAwsClient(&Logger, mgr.GetClient()),
 		Log:       &Logger,
+		K8sClient: &k8s.K8sClient{Client: mgr.GetClient(), Log: &Logger},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "S3Bucket")
 		os.Exit(1)

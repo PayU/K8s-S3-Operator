@@ -19,6 +19,11 @@ var awsCredentialsChainVerboseErrors bool
 var awsS3ForcePathStyle bool
 var devMode bool
 var TAG_PREFIX = "s3.operator/"
+var waitBackoffDuration int64
+var waitBackoffFactor float64
+var waitBackoffSteps int64
+
+
 
 func init() {
 	var err error
@@ -62,6 +67,32 @@ func init() {
 	} else {
 		devMode = false
 	}
+	if WBDString:= os.Getenv("WAIT_BACKOF_DURATION"); WBDString != ""{
+		waitBackoffDuration, err = strconv.ParseInt(WBDString, 10,64)
+		if err != nil {
+			panic(fmt.Sprintf("error on parsing resourcePerPage:[%v]", err))
+		}
+	}else{
+		waitBackoffDuration = 1
+	}
+	if WBFString := os.Getenv("WAIT_BACKOF_FACTOR"); WBFString != ""{
+		waitBackoffFactor, err = strconv.ParseFloat(WBFString, 64)
+		if err != nil {
+			panic(fmt.Sprintf("error on parsing resourcePerPage:[%v]", err))
+		}
+	}else{
+		waitBackoffFactor = 2
+
+	}
+	if WBSString := os.Getenv("WAIT_BACKOF_STEPS"); WBSString!= ""{
+		waitBackoffSteps, err = strconv.ParseInt(WBSString, 10,0)
+		if err != nil {
+			panic(fmt.Sprintf("error on parsing resourcePerPage:[%v]", err))
+		}
+	}else{
+		waitBackoffSteps = 5
+
+	}
 }
 
 func Timeout() time.Duration {
@@ -95,4 +126,13 @@ func DevMode() bool {
 }
 func TagPrefix() string {
 	return TAG_PREFIX
+}
+func WaitBackoffDuration()time.Duration{
+	return time.Duration(waitBackoffDuration) * time.Second
+}
+func WaitBackoffFactor()float64{
+	return waitBackoffFactor
+}
+func WaitBackoffSteps()int{
+	return int(waitBackoffSteps)
 }
