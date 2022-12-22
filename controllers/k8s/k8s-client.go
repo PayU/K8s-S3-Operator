@@ -1,12 +1,14 @@
 package k8s
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
-	"strings"
 
 	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	"github.com/go-logr/logr"
@@ -41,6 +43,8 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 			if err != nil {
 				k.Log.Error(err, "error service account is not match to app")
 				k.deleteServiceAccount(sa)
+			}else{
+				k.Add_SA_to_AC(serviceAcountName,namespace)
 			}
 		} else {
 			k.Log.Error(err, "error to create new service account")
@@ -53,6 +57,7 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 			k.Log.Error(err, "error service account is not match to app")
 		} else {
 			err = k.editServiceAccount(serviceAcountName, namespace, iamRole)
+			k.Add_SA_to_AC(serviceAcountName,namespace)
 		}
 
 	}
@@ -152,55 +157,35 @@ func CheckIfNotFoundError(reqName string, errStr string) bool {
 
 }
 func (k *K8sClient) GetTokenFromSA(SAName string, namespace string) (string, error) {
-	secretName, err := k.GetSecretName(SAName, namespace)
+	token, err := os.ReadFile(config.PathToToken())
 	if err != nil {
+		k.Log.Error(err,"error to read token","token_path",config.PathToToken())
 		return "", err
 	}
-	secret := &v1.Secret{}
-	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: secretName}, secret)
-
-	if err != nil {
-		k.Log.Error(err, "error to get secret", "secret_name", secretName)
-		return "", err
-	}
-	token, ok := secret.Data["token"]
-	if !ok {
-		k.Log.Error(errors.New("no token field in secret"), "no token field in secret")
-		return "", err
-	}
+	k.Log.Info("succeded to get token","token",string(token))//todo remove log 
 	return string(token), nil
 }
 
-func (k *K8sClient) GetSecretName(SAName string, namespace string) (string, error) {
-	sa, err := k.getServiceAccount(SAName, namespace)
-	if err != nil {
-		k.Log.Error(err, "error to get service account")
-		return "", err
-	}
-	var secretName string
-	for _, secretRef := range sa.Secrets {
-		if secretRef.Name != "" {
-			secretName = secretRef.Name
-			break
-		}
-	}
 
-	if secretName == "" {
-		err = errors.New("error finding secret for service account")
-		k.Log.Error(err, "error finding secret for service account")
-		return "", err
-	}
-	return secretName, nil
-}
 func (k *K8sClient) Add_SA_to_AC(SAName string, namespace string)error{
+	k.Log.Info("starting to add service account to AC")
+	token, err := k.GetTokenFromSA(SAName, namespace)
+	if err != nil{
+		return err
+	}
 	httpClient := http.Client{}
-	body := strings.NewReader("body")
-	req, err := http.NewRequest("POST", "url_to_AC",body)
+	byteMap, err := json.Marshal(map[string]string{"img":"123"})
+	if err != nil{
+		k.Log.Error(err,"error to marshal")
+		return err
+	} 
+	body := bytes.NewReader(byteMap)
+	req, err := http.NewRequest("POST", config.PathToAC(),body)
 	if err != nil {
 		k.Log.Error(err,"error create request")
 		return err
 	}
-	req.Header.Add("token","token")
+	req.Header.Add("token",token)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		k.Log.Error(err,"error to post request")

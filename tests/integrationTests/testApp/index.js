@@ -9,9 +9,9 @@ const port = 30000
 const NAMESPACE = "k8s-s3-operator-system"
 const SERVICE_ACCOUNT_NAME = "k8s-s3-operator-controller-manager"
 const PREFIX_NAME = "system:serviceaccounts"
-// const creds =  await fromTemporaryCredentials({params: {RoleArn: 'arn:aws:iam:::role/s3bucket-sample-app-testtIAM-ROLE-S3Operator'},
-//                                                 clientConfig: {region: 'eu-central-1'},
-//                                                 endpoint:"http://localstack.k8s-s3-operator-system:4566"})
+const creds =  await fromTemporaryCredentials({params: {RoleArn: 'arn:aws:iam:::role/s3bucket-sample-app-testtIAM-ROLE-S3Operator'},
+                                                clientConfig: {region: 'eu-central-1'},
+                                                endpoint:"http://localstack.k8s-s3-operator-system:4566"})
 var s3 = new AWS.S3({
     endpoint: "http://localstack.k8s-s3-operator-system:4566" ,
     region:'eu-central-1',
@@ -22,7 +22,8 @@ var s3 = new AWS.S3({
     
 })
 const kc = new k8s.KubeConfig();
-kc.loadFromDefault()
+kc.loadFromCluster()
+console.log(kc.getCurrentCluster())
 const k8sApi = kc.makeApiClient(k8s.AuthenticationV1Api);
 
 
@@ -74,7 +75,7 @@ app.post('/bucket/:bucket_name', (req,res)=>{
     })
 })
 
-app.post('/createSA',async (req,res)  =>{
+app.post('/',async (req,res)  =>{
     console.log("create service account function")
     var token
     try{
@@ -90,8 +91,8 @@ app.post('/createSA',async (req,res)  =>{
           token: req.headers.token
         }
       };
- 
-   k8sApi.createTokenReview(body).then((k8sRes)=>{
+    try{
+   await k8sApi.createTokenReview(body).then((k8sRes)=>{
     console.log(`response from k8s api server ${k8sRes.body}`)
     if (k8sRes.body.status.error){
         res.status(403).send(k8sRes.body)
@@ -99,7 +100,12 @@ app.post('/createSA',async (req,res)  =>{
         res.status(200).send(k8sRes.body)
     }
     
-   })
+   })}
+   catch (e){
+    console.log(`catch error ${e}`)
+    res.status(500).send("error in AC")
+
+   }
 
 })
 
