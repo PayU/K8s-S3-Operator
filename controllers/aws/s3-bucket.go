@@ -3,7 +3,9 @@ package aws
 import (
 	"encoding/json"
 	"errors"
+	"regexp"
 
+	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	"github.com/go-logr/logr"
 
@@ -11,9 +13,77 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
+
+
+func (a *AwsClient) ValidateBucketName(name string) error {
+	if len(name) > 4 && name[:4] == "xn--" {
+		return errors.New("bucket name can't start with xn--")
+	}
+	if len(name) > 8 && name[len(name)-8:] == "-s3alias" {
+		return errors.New("bucket name can't end with -s3alias")
+	}
+	match, _ := regexp.MatchString("^[a-zA-Z][a-zA-Z0-9\\-]+[a-zA-Z0-9]$", name)
+	if !match {
+
+		return errors.New("bucket name not mutch pattern: '^[a-zA-Z][a-zA-Z0-9\\-]+[a-zA-Z0-9]$' ")
+	}
+	return nil
+}
+
+func (a *AwsClient) HandleBucketCreation(bucketSpec *s3operatorv1.S3BucketSpec, bucketName string, namespace string) error {
+
+	bucketInput := a.createBucketInput(bucketName, config.Region())
+	_, err := a.createBucket(*bucketInput)
+	if err != nil {
+		a.Log.Error(err, "got error in create bucket function")
+		return err
+	}
+	a.putBucketTagging(bucketName, &bucketSpec.Tags)
+	roleName := GetRoleName(bucketName)
+	tag := config.DefaultTag()
+	a.iamClient.createIamRole(roleName, &iam.Tag{Key: tag.Key, Value: tag.Value}, a.Log)
+
+	a.putBucketPolicy(bucketName, roleName)
+	if bucketSpec.Encryption {
+		a.putBucketEncrypt(bucketName)
+	}
+	a.Log.Info("S3 bucket creation process finished successfully", "region", config.Region())
+	return nil
+
+}
+
+func (a *AwsClient) HandleBucketDeletion(bucketToDelete string) (bool, error) {
+	a.Log.Info(" Start to delete s3 bucket from aws")
+	isBucketExists, err := a.IsBucketExists(bucketToDelete)
+	if isBucketExists {
+		err := a.cleanupsBucketContent(bucketToDelete)
+		if err != nil {
+			a.Log.Error(err, "err to cleanup bucket")
+			return false, err
+		}
+		_, err = a.deleteBucket(bucketToDelete)
+		if err != nil {
+			a.Log.Error(err, "err delete bucket")
+			return false, err
+		}
+		_, err = a.iamClient.deleteIamRole(GetRoleName(bucketToDelete), a.Log)
+		a.Log.Info("s3 bucket deletion from aws finished successfully")
+	}
+	return true, err
+}
+
+func (a *AwsClient) HandleBucketUpdate(bucketName string, bucketSpec *s3operatorv1.S3BucketSpec) error {
+	a.Log.V(1).Info("HandleBucketUpdate function")
+	_, err := a.updateBucketTags(bucketName, bucketSpec.Tags)
+
+	a.Log.Info("finish to HandleBucketUpdate")
+	return err
+}
+
 
 func (a *AwsClient) IsBucketExists(name string) (bool, error) {
 	_, err := a.s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(name)})
