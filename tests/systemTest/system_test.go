@@ -10,6 +10,7 @@ import (
 	"time"
 
 	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
+	utils "github.com/PayU/K8s-S3-Operator/tests/utils"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/go-logr/logr"
@@ -17,10 +18,6 @@ import (
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -33,6 +30,8 @@ var logger logr.Logger
 var k8sClient client.Client
 var s3Bucket s3operatorv1.S3Bucket
 var graceTime = time.Duration(5)
+var serviceAccountName = "system-test-serviceaccount"
+var appName = "system-test-app"
 
 func TestMain(m *testing.M) {
 	// run local env script befor test
@@ -45,33 +44,16 @@ func TestMain(m *testing.M) {
 
 	ses := awsClient.CreateSession(&logger)
 	s3Client = awsClient.SetS3Client(&logger, ses)
-	s3Client.Endpoint = "http://localhost:4566"
+	s3Client.Endpoint = "http://localhost:4566/localstack"
 
-	createK8SClient()
+	k8sClient = utils.CreateK8SClient(logger)
 
-	s3Bucket = s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: bucketName, Namespace: namespace}}
+	s3Bucket = s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: bucketName, Namespace: namespace},
+		Spec: s3operatorv1.S3BucketSpec{Serviceaccount: serviceAccountName, Selector: map[string]string{"app": appName}}}
 	exitVal := m.Run()
 	logger.Info("finish to run all tests")
 
 	os.Exit(exitVal)
-}
-
-func createK8SClient() {
-	scheme := runtime.NewScheme()
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	utilruntime.Must(s3operatorv1.AddToScheme(scheme))
-
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:           scheme,
-		Port:             9443,
-		LeaderElectionID: "e8727534.payu.com",
-	})
-	if err != nil {
-		logger.Error(err, "error create mew manager")
-	} else {
-		k8sClient = mgr.GetClient()
-	}
 }
 
 func TestCreateBucket(t *testing.T) {

@@ -19,6 +19,9 @@ if [ "$current_context" = "kind-$CLUSTER_NAME" ]; then
     echo "run local aws loacalstack on cluster"
     make run-local-aws-on-cluster
 
+    echo "deploy empty app and serviceaccount for system test"
+    make deploy-system-test-app
+
 else
   echo "Please set the current cluster context to kind-$CLUSTER_NAME and re-run the install script"
 fi

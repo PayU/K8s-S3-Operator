@@ -18,10 +18,11 @@ package controllers
 
 import (
 	"context"
-	"regexp"
+	"time"
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
+	k8s "github.com/PayU/K8s-S3-Operator/controllers/k8s"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,9 +36,12 @@ type S3BucketReconciler struct {
 	Scheme    *runtime.Scheme
 	Log       *logr.Logger
 	AwsClient *awsClient.AwsClient
+	K8sClient *k8s.K8sClient
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=serviceaccounts;pods,verbs=get;list;watch;create;update;patch;delete
+
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets/finalizers,verbs=update
 
@@ -52,14 +56,15 @@ type S3BucketReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", req.Namespace, "bucket_name", req.Name)
+	r.AwsClient.Log = &log
 	var s3Bucket s3operatorv1.S3Bucket
 
 	errToGet := r.Get(context.TODO(), req.NamespacedName, &s3Bucket)
 	if errToGet != nil {
 		var err error
 		isDeleted := false
-		if CheckIfNotFoundError(req.Name, errToGet.Error()) { // check if resource not exists
-			isDeleted, err = r.AwsClient.HandleBucketDeletion(req.Name, &log)
+		if k8s.CheckIfNotFoundError(req.Name, errToGet.Error()) { // check if resource not exists
+			isDeleted, err = r.handleDeleteFlow(&s3Bucket.Spec, req.Name, req.Namespace)
 		} else { //unexpcted error
 			log.Error(errToGet, "unexpcted error in Get in Reconcile function")
 			err = errToGet
@@ -68,17 +73,17 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{Requeue: !isDeleted}, err
 	}
 	//succeded to get resource, check if need to create or update
-	isbucketExists, err := r.AwsClient.BucketExists(s3Bucket.Name, &log)
+	isbucketExists, err := r.AwsClient.IsBucketExists(s3Bucket.Name)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
 	if isbucketExists {
-		_, err = r.AwsClient.HandleBucketUpdate(s3Bucket.Name, &s3Bucket.Spec, &log)
+		err = r.handleUpdateFlow(&s3Bucket.Spec, s3Bucket.Name, req.Namespace)
 	} else { //bucket not exists in aws, create
-		_, err = r.AwsClient.HandleBucketCreation(&s3Bucket.Spec, s3Bucket.Name, &log)
+		err = r.handleCreationFlow(&s3Bucket.Spec, s3Bucket.Name, req.Namespace)
 	}
 	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{Requeue: true, RequeueAfter: time.Duration(10 * time.Second)}, err
 	}
 	return ctrl.Result{Requeue: false}, err
 }
@@ -90,9 +95,32 @@ func (r *S3BucketReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func CheckIfNotFoundError(reqName string, errStr string) bool {
-	pattern := reqName + "\" not found"
-	match, _ := regexp.MatchString(pattern, errStr)
-	return match
+func (r *S3BucketReconciler) handleCreationFlow(bucketSpec *s3operatorv1.S3BucketSpec, bucketName string, namespace string) error {
+	err := r.AwsClient.ValidateBucketName(bucketName)
+	if err != nil {
+		r.Log.Error(err, "bucket name is unvalid")
+		return err
+	}
+	// create or update service account
+	err = r.K8sClient.HandleSACreate(bucketSpec.Serviceaccount, namespace, awsClient.GetRoleName(bucketName), bucketSpec.Selector)
+	if err != nil {
+		return err
+	}
 
+	err = r.AwsClient.HandleBucketCreation(bucketSpec, bucketName, namespace)
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
+func (r *S3BucketReconciler) handleUpdateFlow(bucketSpec *s3operatorv1.S3BucketSpec, bucketName string, namespace string) error {
+	err := r.AwsClient.HandleBucketUpdate(bucketName, bucketSpec)
+	return err
+}
+
+func (r *S3BucketReconciler) handleDeleteFlow(bucketSpec *s3operatorv1.S3BucketSpec, bucketName string, namespace string) (bool, error) {
+	isDelted, err := r.AwsClient.HandleBucketDeletion(bucketName)
+	return isDelted, err
 }

@@ -9,3 +9,9 @@ metadata:
     app.kubernetes.io/created-by: k8s-s3-operator
   name: s3bucket-sample
   namespace: k8s-s3-operator-system
+spec:
+  encryption: false
+  serviceaccount: service-account-test
+  selector:
+    app: test-app
+

@@ -22,6 +22,13 @@ import (
 
 // S3BucketSpec defines the desired state of S3Bucket
 type S3BucketSpec struct {
+	// +kubebuilder:validation:MinLength:=3
+	// +kubebuilder:validation:MaxLength:=63
+	// +kubebuilder:validation:Pattern:=^[a-z0-9][a-z0-9-]*[a-z0-9]$
+	Serviceaccount string `json:"serviceaccount"`
+
+	// +kubebuilder:validation:MinItems=1
+	Selector map[string]string `json:"selector,omitempty"`
 
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`

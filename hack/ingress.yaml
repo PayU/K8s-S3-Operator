@@ -2,13 +2,15 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: localstack-ingress
+  annotations:
+    konghq.com/strip-path: "true"
 spec:
   ingressClassName: kong
   rules:
   - http:
       paths:
       - pathType: Prefix
-        path: "/"
+        path: "/localstack"
         backend:
           service:
             name: localstack

@@ -38,10 +38,21 @@ spec:
               encryption:
                 default: false
                 type: boolean
+              selector:
+                additionalProperties:
+                  type: string
+                type: object
+              serviceaccount:
+                maxLength: 63
+                minLength: 3
+                pattern: ^[a-z0-9][a-z0-9-]*[a-z0-9]$
+                type: string
               tags:
                 additionalProperties:
                   type: string
                 type: object
+            required:
+            - serviceaccount
             type: object
           status:
             description: S3BucketStatus defines the observed state of S3Bucket

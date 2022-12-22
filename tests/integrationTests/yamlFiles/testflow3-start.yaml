@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+  namespace: k8s-s3-operator-system
+spec:
+  selector:
+    matchLabels:
+      app: test-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: app-test
+        image: apptest:new
+        ports:
+          - containerPort: 30000
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+      serviceAccountName: s3-operator-test-app
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: s3-operator-test-app
+  namespace: k8s-s3-operator-system

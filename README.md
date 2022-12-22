@@ -13,7 +13,8 @@ Requirements:
 * `docker`: latest version
 * `golang` >= 1.17
 
-**Quick Start**
+## **Quick-Start**
+
 
 This script will create kind cluster,
      build image of the controller and deploy it,
@@ -36,6 +37,18 @@ run tests:
     1. upload local env:
        1.1.  sh ./hack/scripts/runLocalEnv.sh
     2. go test ./tests/systemTest/system_test.go -v # -v flag for log all tests as they are run
+```
+### **Run integration tests**
+The integretion tests test the functionality of integration between deploying/update app to deploying new s3bucket
+
+
+run tests:
+
+1. deploy local env -> see ([Quick-Start](##Quick-Start))
+2. Run
+```bash
+    sh ./tests/integrationTests/testApp/uploadApp.sh
+    go test ./tests/integrationTests/integration_test.go -v
 ```
 
 ### **Development using Tilt**
