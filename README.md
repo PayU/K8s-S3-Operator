@@ -48,7 +48,7 @@ run tests:
 2. Run
 ```bash
     sh ./tests/integrationTests/testApp/uploadApp.sh
-    go test ./tests/integrationTests/integration_test.go
+    go test ./tests/integrationTests/integration_test.go -v
 ```
 
 ### **Development using Tilt**

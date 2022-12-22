@@ -74,3 +74,8 @@ func setIamClient(Log *logr.Logger, ses *session.Session) *iam.IAM {
 	return iamClient
 
 }
+func GetRoleName(bucketName string) string {
+	roleName := bucketName + "IAM-ROLE-S3Operator"
+	iamRole := "arn:aws:iam:::role/" + roleName
+	return iamRole
+}
