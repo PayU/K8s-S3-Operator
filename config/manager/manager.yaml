@@ -43,7 +43,7 @@ spec:
         name: manager
         volumeMounts:
         - mountPath: /var/run/secrets/tokens
-          name: vault-token
+          name: token
         livenessProbe:
           httpGet:
             path: /healthz
@@ -70,11 +70,20 @@ spec:
           value: test
       serviceAccountName: k8s-s3-operator-controller-manager
       volumes:
-      - name: vault-token
+      - name: token
         projected:
           sources:
           - serviceAccountToken:
-              path: vault-token
+              path: token
               expirationSeconds: 7200
-              audience: vault
       terminationGracePeriodSeconds: 10
+---
+kind: ConfigMap 
+apiVersion: v1 
+metadata:
+  name: config-map-body
+  namespace: k8s-s3-operator-system 
+data:
+  # Configuration values can be set as key-value properties
+  img: spec.Containers[0].Image
+  serviceaccount: Spec.ServiceAccountName

@@ -24,6 +24,7 @@ var waitBackoffFactor float64
 var waitBackoffSteps int64
 var pathToToken string
 var pathToAC string
+var configMapName string
 
 func init() {
 	var err error
@@ -93,10 +94,13 @@ func init() {
 		waitBackoffSteps = 5
 	}
 	if pathToToken = os.Getenv("PATH_TO_TOKEN"); pathToToken == "" {
-		pathToToken = "/var/run/secrets/tokens/vault-token"
+		pathToToken = "/var/run/secrets/tokens/token"
 	}
 	if pathToAC = os.Getenv("PATH_TO_AC"); pathToAC == "" {
 		pathToAC = "http://test-app-service.k8s-s3-operator-system:30000"
+	}
+	if configMapName = os.Getenv("CONFIG_MAP_NAME"); configMapName == "" {
+		configMapName = "k8s-s3-operator-config-map-body"
 	}
 }
 
@@ -146,4 +150,7 @@ func PathToToken() string {
 }
 func PathToAC() string {
 	return pathToAC
+}
+func ConfigMapName() string {
+	return configMapName
 }

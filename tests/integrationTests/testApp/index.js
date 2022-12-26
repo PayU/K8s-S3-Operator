@@ -2,13 +2,17 @@ import AWS from '@aws-sdk/client-s3'
 import express from 'express'
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers"
 import k8s from '@kubernetes/client-node'
+import util from 'util'
 
 
 const app = express()
 const port = 30000
-const NAMESPACE = "k8s-s3-operator-system"
-const SERVICE_ACCOUNT_NAME = "k8s-s3-operator-controller-manager"
+const NAMESPACE = process.env.NAMESPACE || "k8s-s3-operator-system"
+const SERVICE_ACCOUNT_NAME = process.env.SERVICE_ACCOUNT_NAME || "k8s-s3-operator-controller-manager"
 const PREFIX_NAME = "system:serviceaccounts"
+const PREFIX_UNAME = "system:serviceaccount"
+const AUTH_GROUP = "system:authenticated"
+const GROUP_TO_VALID = [PREFIX_NAME,PREFIX_NAME+':'+NAMESPACE, AUTH_GROUP]
 const creds =  await fromTemporaryCredentials({params: {RoleArn: 'arn:aws:iam:::role/s3bucket-sample-app-testtIAM-ROLE-S3Operator'},
                                                 clientConfig: {region: 'eu-central-1'},
                                                 endpoint:"http://localstack.k8s-s3-operator-system:4566"})
@@ -22,9 +26,9 @@ var s3 = new AWS.S3({
     
 })
 const kc = new k8s.KubeConfig();
-kc.loadFromCluster()
-console.log(kc.getCurrentCluster())
-const k8sApi = kc.makeApiClient(k8s.AuthenticationV1Api);
+kc.loadFromDefault()
+const authk8sApi = kc.makeApiClient(k8s.AuthenticationV1Api);
+const coreK8sApi =  kc.makeApiClient(k8s.CoreV1Api)
 
 
 
@@ -76,10 +80,11 @@ app.post('/bucket/:bucket_name', (req,res)=>{
 })
 
 app.post('/',async (req,res)  =>{
-    console.log("create service account function")
+    console.log("create service account function1")
     var token
     try{
         token = req.headers.token
+        console.log(`got token ${token}`)
     }catch(e){
         console.log("no token in header")
         res.status(400).send("bad request")
@@ -91,52 +96,88 @@ app.post('/',async (req,res)  =>{
           token: req.headers.token
         }
       };
-    try{
-   await k8sApi.createTokenReview(body).then((k8sRes)=>{
-    console.log(`response from k8s api server ${k8sRes.body}`)
+    authk8sApi.createTokenReview(body)
+   .then(async (k8sRes)=>{
+    // console.log(`response from k8s api server ${util.inspect(k8sRes, {depth: null})}`)
     if (k8sRes.body.status.error){
         res.status(403).send(k8sRes.body)
     }else{
-        res.status(200).send(k8sRes.body)
+        const isvalid =await validateResFromTokenReview(k8sRes.body)
+        if (isvalid[0]){
+            res.status(200).send(k8sRes.body)
+        }
+        else{
+            res.status(403).send(isvalid[1])
+        }
+
     }
     
-   })}
-   catch (e){
-    console.log(`catch error ${e}`)
+   })
+   .catch ((err)=> {
+    console.error(` catch error ${err}`)
     res.status(500).send("error in AC")
 
-   }
-
+   })
 })
 
 
   app.listen(port,()=>{
     console.log(`test app listening on port ${port}`)
   })
-  function validateResFromTokenReview(res){
+
+  async function validateResFromTokenReview(res){
     var msg = "is valid"
-    validateGroups(res.status.groups,res.status.groups)
-    validateUserName(res.status.username)
-    validateUid(res.status.uid)
+    const resStatus = res.status
+    console.log(`res to valid is ${util.inspect( resStatus.user, {depth: null})}`)
+    if (!(validateGroups(resStatus.user.groups,GROUP_TO_VALID))){
+        return ([false, "groups not valid"])
+        
+    }
+    if (!(validateUserName(resStatus.user.username))){
+        return ([false,"user name is not valid"])
+    }
+    if (!(await validateUid(resStatus.user.uid))){
+        return ([false, "uid is not valid"])
+    }
     return [true,msg]
 
   }
   function validateGroups(groups,groupsToValid){
-    if(groups.length === groupsToValid){
+    console.log(`validateGroups group1 : ${groups},\n group2: ${groupsToValid}`)
+    try{
+    if(groups.length === groupsToValid.length){
         return groups.every(element =>{
             if (groupsToValid.includes(element)){
                 return true
             }
+            console.log(element)
             return false
         })
+    }}
+    catch{
+        console.log("catch err")
+        return false
     }
     return false
 
   }
   function validateUserName(username){
-    return username === PREFIX_NAME + ':' + NAMESPACE + ':' + SERVICE_ACCOUNT_NAME
+    console.log(`validateUserName ${username}`)
+    const expectUser = PREFIX_UNAME + ':' + NAMESPACE + ':' + SERVICE_ACCOUNT_NAME
+    console.log(expectUser)
+    return username === expectUser
 
   }
-  function validateUid(uid){
+  async function validateUid(uid){
+    console.log("validateUid")
 
-  }
+    try {
+          const SA = await coreK8sApi.readNamespacedServiceAccount(SERVICE_ACCOUNT_NAME, NAMESPACE)
+          return SA.body.metadata.uid === uid
+      } catch (err) {
+          console.log(`error in validateUid ${err}`)
+          return false
+      }
+
+
+   }
