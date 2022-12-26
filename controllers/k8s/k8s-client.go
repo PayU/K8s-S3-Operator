@@ -3,16 +3,11 @@ package k8s
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"reflect"
-	"regexp"
-	"strconv"
-	"strings"
+
 
 	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	"github.com/go-logr/logr"
@@ -31,12 +26,12 @@ type K8sClient struct {
 
 func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, iamRole string, s3Selector map[string]string) error {
 	k.Log.Info("starting to handle service account creation", "SA_name", serviceAcountName, "namespace", namespace, "iam_role", iamRole)
-	//check if SA exsist
+	//check if SA - service account exsist
 	sa, err := k.getServiceAccount(serviceAcountName, namespace)
 	if err != nil {
 		return err //unexpected error in get service account function
 	}
-	if sa == nil {
+	if sa == nil {//service account not exists
 		sa, err = k.createServiceAccount(serviceAcountName, namespace, iamRole)
 		if err == nil {
 			k.Log.Info("succseded to create new service account")
@@ -44,24 +39,25 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 				err = k.checkMatchingAppToServiceAccount(serviceAcountName, s3Selector, namespace)
 				return err == nil, nil
 			})
+			// after service account created
 			if err != nil {
 				k.Log.Error(err, "error service account is not match to app")
 				k.deleteServiceAccount(sa)
 			} else {
-				k.Add_SA_to_AC(serviceAcountName, namespace, s3Selector)
+				k.Add_SA_to_Auth_Server(serviceAcountName, namespace, s3Selector)
 			}
 		} else {
 			k.Log.Error(err, "error to create new service account")
 		}
 		return err
 
-	} else {
+	} else {//service accoun exsist
 		err = k.checkMatchingAppToServiceAccount(serviceAcountName, s3Selector, namespace)
 		if err != nil {
 			k.Log.Error(err, "error service account is not match to app")
 		} else {
 			err = k.editServiceAccount(serviceAcountName, namespace, iamRole)
-			k.Add_SA_to_AC(serviceAcountName, namespace, s3Selector)
+			k.Add_SA_to_Auth_Server(serviceAcountName, namespace, s3Selector)
 		}
 
 	}
@@ -147,23 +143,18 @@ func (k *K8sClient) deleteServiceAccount(sa *v1.ServiceAccount) error {
 	return err
 }
 
-func CheckIfNotFoundError(reqName string, errStr string) bool {
-	pattern := reqName + "\" not found"
-	match, _ := regexp.MatchString(pattern, errStr)
-	return match
 
-}
 func (k *K8sClient) GetTokenFromSA(SAName string, namespace string) (string, error) {
 	token, err := os.ReadFile(config.PathToToken())
 	if err != nil {
 		k.Log.Error(err, "error to read token", "token_path", config.PathToToken())
 		return "", err
 	}
-	k.Log.Info("succeded to get token", "token", string(token)) //todo remove log
+	k.Log.Info("succeded to get token") 
 	return string(token), nil
 }
 
-func (k *K8sClient) Add_SA_to_AC(SAName string, namespace string, labelsFromS3 map[string]string) error {
+func (k *K8sClient) Add_SA_to_Auth_Server(SAName string, namespace string, labelsFromS3 map[string]string) error {
 	k.Log.Info("starting to add service account to AC")
 	token, err := k.GetTokenFromSA(SAName, namespace)
 	if err != nil {
@@ -193,16 +184,7 @@ func (k *K8sClient) Add_SA_to_AC(SAName string, namespace string, labelsFromS3 m
 	return validateResponse(res.StatusCode, string(resBody), k.Log)
 }
 
-func validateResponse(statusCode int, body string, Log *logr.Logger) error {
-	if statusCode != 200 {
-		err := errors.New("didnt succeded to add service account")
-		Log.Error(err, "error from auth server", "statusCode", statusCode, "body", body)
 
-		return err
-	}
-	Log.Info("succeded to add to service account to  auth server", "statusCode", statusCode, "body", body)
-	return nil
-}
 func (k *K8sClient) setBody(namespace string, labelsFromS3 map[string]string) *bytes.Reader {
 	// get config map that map the body of request
 	cm, err := k.getConfigMap(config.ConfigMapName(), namespace)
@@ -215,61 +197,13 @@ func (k *K8sClient) setBody(namespace string, labelsFromS3 map[string]string) *b
 	if err != nil {
 		return nil
 	}
-	dataMap := k.cerateMapForBody(cm.Data, appPods.Items[0])
+	dataMap := cerateMapForBody(cm.Data, appPods.Items[0],k.Log)
 
 	body := convertMapToByte(dataMap, k.Log)
 	return body
 
 }
-func (k *K8sClient) getValue(key string, obj v1.Pod) (interface{}, error) {
-	var val reflect.Value
-	var err error
-	// Use the recover function to handle panics.
-	defer func() {
-		k.Log.Info("dfer")
-		if r := recover(); r != nil {
-			err = errors.New("got panic in function")
-			k.Log.Error(err, "got panic in function", "r", r)
-		}
-	}()
 
-	splitedStr := strings.Split(key, ".")
-
-	val = reflect.ValueOf(obj)
-	for _, part := range splitedStr {
-		part = toUpperFirstLetter(part)
-		// Check if the value is a slice.
-		if strings.Contains(part, "[") {
-			// Extract the index from the part.
-			index := strings.Index(part, "[")
-			// Convert the index to an int.
-			i, err := strconv.Atoi(part[index+1 : index+2])
-			if err != nil {
-				return nil, err
-			}
-			val = val.FieldByName(part[:index]).Index(i)
-
-		} else {
-			// Get the field with the specified name.
-			val = val.FieldByName(part)
-
-		}
-	}
-	return val.Interface(), err
-}
-func (k *K8sClient) cerateMapForBody(dataMap map[string]string, appPod v1.Pod) map[string]string {
-	for key, val := range dataMap {
-		k.Log.V(1).Info("inside loop of setBody", "key", key, "val", val)
-		val, err := k.getValue(val, appPod)
-		if err != nil {
-			k.Log.Error(err, "error to get value")
-			return nil
-		}
-		k.Log.V(1).Info("got value from get value func", "key", key, "val", val)
-		dataMap[key] = fmt.Sprint(val)
-	}
-	return dataMap
-}
 
 func (k *K8sClient) getConfigMap(configMapName string, namespace string) (*v1.ConfigMap, error) {
 	cm := &v1.ConfigMap{}
@@ -295,15 +229,4 @@ func (k *K8sClient) getPodList(namespace string, labelsFromS3 map[string]string,
 	}
 	return nil
 }
-func toUpperFirstLetter(str string) string {
-	return strings.ToUpper(string(str[0])) + str[1:]
-}
-func convertMapToByte(dataMap map[string]string, Log *logr.Logger) *bytes.Reader {
-	byteMap, err := json.Marshal(dataMap)
-	if err != nil {
-		Log.Error(err, "error to marshal")
-		return nil
-	}
-	return bytes.NewReader(byteMap)
 
-}

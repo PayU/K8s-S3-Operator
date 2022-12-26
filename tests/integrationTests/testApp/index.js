@@ -80,7 +80,7 @@ app.post('/bucket/:bucket_name', (req,res)=>{
 })
 
 app.post('/',async (req,res)  =>{
-    console.log("create service account function1")
+    console.log("create service account function")
     var token
     try{
         token = req.headers.token
@@ -98,7 +98,6 @@ app.post('/',async (req,res)  =>{
       };
     authk8sApi.createTokenReview(body)
    .then(async (k8sRes)=>{
-    // console.log(`response from k8s api server ${util.inspect(k8sRes, {depth: null})}`)
     if (k8sRes.body.status.error){
         res.status(403).send(k8sRes.body)
     }else{
@@ -169,10 +168,11 @@ app.post('/',async (req,res)  =>{
 
   }
   async function validateUid(uid){
-    console.log("validateUid")
+    console.log(`validateUid function got uid: ${uid}`)
 
     try {
           const SA = await coreK8sApi.readNamespacedServiceAccount(SERVICE_ACCOUNT_NAME, NAMESPACE)
+          console.log(`got service account ${SA}`)
           return SA.body.metadata.uid === uid
       } catch (err) {
           console.log(`error in validateUid ${err}`)
