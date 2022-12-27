@@ -1,0 +1,59 @@
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-app-service
+  namespace: k8s-s3-operator-system
+spec:
+  type: NodePort
+  selector:
+    app: test-app
+  ports:
+    - protocol: TCP
+      nodePort: 30000
+      port: 30000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test-app-ingress
+  namespace: k8s-s3-operator-system
+  annotations:
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - pathType: Prefix
+        path: "/test-app"
+        backend:
+          service:
+            name: test-app-service
+            port:
+              number: 30000
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: token-review-cluster-role
+rules:
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create","watch","get","list"]
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["watch","get","list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: token-review-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: token-review-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: s3-operator-test-app
+  namespace:  k8s-s3-operator-system
