@@ -1,4 +1,4 @@
-name: GitHub Actions Demo
+name: ci tests
 run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
 on: [push]
 jobs:
@@ -16,3 +16,12 @@ jobs:
         run: |
           ls ${{ github.workspace }}
       - run: echo "🍏 This job's status is ${{ job.status }}."
+
+  Create-Kind-Cluster:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "create kind cluster"
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.4.0
+        with:
+          config: ../../hack/kindConfig.yaml
