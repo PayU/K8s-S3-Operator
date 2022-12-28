@@ -1,16 +1,19 @@
 import AWS from '@aws-sdk/client-s3'
 import express from 'express'
+import bodyParser from 'body-parser'
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers"
 import k8s from '@kubernetes/client-node'
 import util from 'util'
 
 
 const app = express()
+
 const port = 30000
 const NAMESPACE = process.env.NAMESPACE || "k8s-s3-operator-system"
 const SERVICE_ACCOUNT_NAME = process.env.SERVICE_ACCOUNT_NAME || "k8s-s3-operator-controller-manager"
-const PREFIX_NAME = "system:serviceaccounts"
-const PREFIX_UNAME = "system:serviceaccount"
+const ERR_MODE = process.env.ERR_MODE || false
+const PREFIX_NAME = process.env.PREFIX_NAME || "system:serviceaccounts"
+const PREFIX_UNAME = process.env.PREFIX_UNAME || "system:serviceaccount"
 const AUTH_GROUP = "system:authenticated"
 const GROUP_TO_VALID = [PREFIX_NAME,PREFIX_NAME+':'+NAMESPACE, AUTH_GROUP]
 const creds =  await fromTemporaryCredentials({params: {RoleArn: 'arn:aws:iam:::role/s3bucket-sample-app-testtIAM-ROLE-S3Operator'},
@@ -29,9 +32,10 @@ const kc = new k8s.KubeConfig();
 kc.loadFromDefault()
 const authk8sApi = kc.makeApiClient(k8s.AuthenticationV1Api);
 const coreK8sApi =  kc.makeApiClient(k8s.CoreV1Api)
+var counter = 0
 
 
-
+app.use(bodyParser.json())
 
 
 app.get('/', (req, res) => {
@@ -81,44 +85,62 @@ app.post('/bucket/:bucket_name', (req,res)=>{
 
 app.post('/',async (req,res)  =>{
     console.log("create service account function")
-    var token
-    try{
-        token = req.headers.token
-        console.log(`got token ${token}`)
-    }catch(e){
-        console.log("no token in header")
-        res.status(400).send("bad request")
-    }
-    const body = {
-        apiVersion: 'authentication.k8s.io/v1',
-        kind: 'TokenReview',
-        spec: {
-          token: req.headers.token
-        }
-      };
-    authk8sApi.createTokenReview(body)
-   .then(async (k8sRes)=>{
-    if (k8sRes.body.status.error){
-        res.status(403).send(k8sRes.body)
+    counter = counter +1
+    console.log(`err mode is ${ERR_MODE}`)
+    if (ERR_MODE){
+        res.status(500).send("internal error")
     }else{
-        const isvalid =await validateResFromTokenReview(k8sRes.body)
-        if (isvalid[0]){
-            res.status(200).send(k8sRes.body)
+        var token
+        try{
+            token = req.headers.token
+            console.log(`got token ${token}`)
+        }catch(e){
+            console.log("no token in header")
+            res.status(400).send("bad request")
         }
-        else{
-            res.status(403).send(isvalid[1])
+        const body = {
+            apiVersion: 'authentication.k8s.io/v1',
+            kind: 'TokenReview',
+            spec: {
+            token: req.headers.token
+            }
+        };
+        authk8sApi.createTokenReview(body)
+    .then(async (k8sRes)=>{
+        if (k8sRes.body.status.error){
+            res.status(403).send(k8sRes.body)
+        }else{
+            const isvalid =await validateResFromTokenReview(k8sRes.body)
+            if (isvalid[0]){
+                res.status(200).send(k8sRes.body)
+            }
+            else{
+                res.status(403).send(isvalid[1])
+            }
+
         }
+        
+    })
+    .catch ((err)=> {
+        console.error(` catch error ${err}`)
+        res.status(500).send("error in AC")
 
-    }
-    
-   })
-   .catch ((err)=> {
-    console.error(` catch error ${err}`)
-    res.status(500).send("error in AC")
+    })
+}})
 
-   })
+app.post('/test',async (req,res)  =>{
+    console.log(`test function got body ${util.inspect( req.body, {depth: null})}`)
+    res.status(req.body.status).send(req.body.msg)
 })
-
+app.get('/counter',(req, res) =>{
+    console.log(`get counter counter is : ${counter}`)
+    res.status(200).send({counter:counter})
+})
+app.patch('/counter',(req, res) =>{
+    console.log("reset counter")
+    counter = 0
+    res.status(200).send({"counter":0})
+})
 
   app.listen(port,()=>{
     console.log(`test app listening on port ${port}`)

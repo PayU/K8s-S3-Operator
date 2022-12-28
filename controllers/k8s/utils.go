@@ -16,15 +16,15 @@ import (
 
 
 
-func validateResponse(statusCode int, body string, Log *logr.Logger) error {
+func validateResponse(statusCode int, body string, Log *logr.Logger)(int, error) {
 	if statusCode != 200 {
 		err := errors.New("didnt succeded to add service account")
 		Log.Error(err, "error from auth server", "statusCode", statusCode, "body", body)
 
-		return err
+		return statusCode, err
 	}
 	Log.Info("succeded to add to service account to  auth server", "statusCode", statusCode, "body", body)
-	return nil
+	return statusCode, nil
 }
 
 func cerateMapForBody(dataMap map[string]string, appPod v1.Pod, Log *logr.Logger) map[string]string {
@@ -59,7 +59,6 @@ func getValue(key string, obj v1.Pod,Log *logr.Logger) (interface{}, error) {
 	var err error
 	// Use the recover function to handle panics.
 	defer func() {
-		Log.Info("dfer")
 		if r := recover(); r != nil {
 			err = errors.New("got panic in function")
 			Log.Error(err, "got panic in function", "r", r)

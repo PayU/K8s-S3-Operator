@@ -5,5 +5,4 @@ cd ./tests/integrationTests/testApp/
 docker build -t ${IMG} -f ./appTest.Dockerfile .
 kind load docker-image ${IMG} --name ${CLUSTER_NAME}
 cd ../
-kubectl apply -f ./yamlFiles/services.yaml
-
+kubectl apply -f ./yamlFiles/deployAuthServer.yaml

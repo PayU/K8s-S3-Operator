@@ -97,7 +97,7 @@ func init() {
 		pathToToken = "/var/run/secrets/tokens/token"
 	}
 	if pathToAC = os.Getenv("PATH_TO_AC"); pathToAC == "" {
-		pathToAC = "http://test-app-service.k8s-s3-operator-system:30000"
+		pathToAC = "http://auth-server-service.k8s-s3-operator-system:30000"
 	}
 	if configMapName = os.Getenv("CONFIG_MAP_NAME"); configMapName == "" {
 		configMapName = "k8s-s3-operator-config-map-body"

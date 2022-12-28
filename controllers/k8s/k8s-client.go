@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
-
 
 	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	"github.com/go-logr/logr"
@@ -25,13 +24,13 @@ type K8sClient struct {
 }
 
 func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, iamRole string, s3Selector map[string]string) error {
-	k.Log.Info("starting to handle service account creation", "SA_name", serviceAcountName, "namespace", namespace, "iam_role", iamRole)
+	k.Log.Info("starting to handle service account creation", "serviceAcount Name", serviceAcountName, "namespace", namespace, "iam_role", iamRole)
 	//check if SA - service account exsist
 	sa, err := k.getServiceAccount(serviceAcountName, namespace)
 	if err != nil {
 		return err //unexpected error in get service account function
 	}
-	if sa == nil {//service account not exists
+	if sa == nil { //service account not exists
 		sa, err = k.createServiceAccount(serviceAcountName, namespace, iamRole)
 		if err == nil {
 			k.Log.Info("succseded to create new service account")
@@ -43,21 +42,28 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 			if err != nil {
 				k.Log.Error(err, "error service account is not match to app")
 				k.deleteServiceAccount(sa)
-			} else {
-				k.Add_SA_to_Auth_Server(serviceAcountName, namespace, s3Selector)
+			} else {// adding to service account to auth server
+				wait.ExponentialBackoff(wait.Backoff{Duration: config.WaitBackoffDuration(), Factor: config.WaitBackoffFactor(), Steps: config.WaitBackoffSteps()}, func() (done bool, err error) {
+					statuscode, err := k.addSAToAuthServer(serviceAcountName, namespace, s3Selector)
+					return err == nil || statuscode == 403, nil
+				})
+				if err != nil {// didnt succeded to add service account to auth server
+					k.Log.Error(err, "error to add service account to auth server")
+					k.deleteServiceAccount(sa)
+				}
+
 			}
 		} else {
 			k.Log.Error(err, "error to create new service account")
 		}
 		return err
 
-	} else {//service accoun exsist
+	} else { //service accoun exsist
 		err = k.checkMatchingAppToServiceAccount(serviceAcountName, s3Selector, namespace)
 		if err != nil {
 			k.Log.Error(err, "error service account is not match to app")
 		} else {
 			err = k.editServiceAccount(serviceAcountName, namespace, iamRole)
-			k.Add_SA_to_Auth_Server(serviceAcountName, namespace, s3Selector)
 		}
 
 	}
@@ -143,47 +149,45 @@ func (k *K8sClient) deleteServiceAccount(sa *v1.ServiceAccount) error {
 	return err
 }
 
-
-func (k *K8sClient) GetTokenFromSA(SAName string, namespace string) (string, error) {
+func (k *K8sClient) getTokenFromSA(SAName string, namespace string) (string, error) {
 	token, err := os.ReadFile(config.PathToToken())
 	if err != nil {
 		k.Log.Error(err, "error to read token", "token_path", config.PathToToken())
 		return "", err
 	}
-	k.Log.Info("succeded to get token") 
+	k.Log.Info("succeded to get token")
 	return string(token), nil
 }
 
-func (k *K8sClient) Add_SA_to_Auth_Server(SAName string, namespace string, labelsFromS3 map[string]string) error {
+func (k *K8sClient) addSAToAuthServer(SAName string, namespace string, labelsFromS3 map[string]string) (int, error) {
 	k.Log.Info("starting to add service account to AC")
-	token, err := k.GetTokenFromSA(SAName, namespace)
+	token, err := k.getTokenFromSA(SAName, namespace)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	httpClient := http.Client{}
 
 	req, err := http.NewRequest("POST", config.PathToAC(), k.setBody(namespace, labelsFromS3))
 	if err != nil {
 		k.Log.Error(err, "error create request")
-		return err
+		return 0, err
 	}
 	req.Header.Add("token", token)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		k.Log.Error(err, "error to post request")
-		return err
+		return 0, err
 	}
 
 	defer res.Body.Close()
-	resBody, err := ioutil.ReadAll(res.Body)
+	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		k.Log.Error(err, "error to read body")
-		return err
+		return 0, err
 	}
-	
+
 	return validateResponse(res.StatusCode, string(resBody), k.Log)
 }
-
 
 func (k *K8sClient) setBody(namespace string, labelsFromS3 map[string]string) *bytes.Reader {
 	// get config map that map the body of request
@@ -197,13 +201,12 @@ func (k *K8sClient) setBody(namespace string, labelsFromS3 map[string]string) *b
 	if err != nil {
 		return nil
 	}
-	dataMap := cerateMapForBody(cm.Data, appPods.Items[0],k.Log)
+	dataMap := cerateMapForBody(cm.Data, appPods.Items[0], k.Log)
 
 	body := convertMapToByte(dataMap, k.Log)
 	return body
 
 }
-
 
 func (k *K8sClient) getConfigMap(configMapName string, namespace string) (*v1.ConfigMap, error) {
 	cm := &v1.ConfigMap{}
@@ -229,4 +232,3 @@ func (k *K8sClient) getPodList(namespace string, labelsFromS3 map[string]string,
 	}
 	return nil
 }
-

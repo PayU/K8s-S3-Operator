@@ -48,7 +48,7 @@ run tests:
 2. Run
 ```bash
     sh ./tests/integrationTests/testApp/uploadApp.sh
-    go test ./tests/integrationTests/integration_test.go -v
+    go test ./tests/integrationTests/integration_test.go -timeout 120s -v
 ```
 
 ### **Development using Tilt**

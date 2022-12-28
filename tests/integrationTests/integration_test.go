@@ -2,6 +2,9 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"testing"
@@ -18,10 +21,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	. "github.com/onsi/gomega"
-	// "k8s.io/apimachinery/pkg/runtime"
-	// utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	// clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	// ctrl "sigs.k8s.io/controller-runtime"
 )
 
 /*integration test will test 3 flows.
@@ -39,7 +38,9 @@ const (
 	serviceAccountName = "s3-operator-test-app"
 	s3BucketName       = "s3bucket-sample-app-testt"
 	namespace          = "k8s-s3-operator-system"
+	pathToAuthServer   = "http://localhost:4566/test-app"
 	graceTime          = time.Duration(10)
+	graceTimeAppChange = time.Duration(20)
 )
 
 func TestMain(m *testing.M) {
@@ -50,8 +51,8 @@ func TestMain(m *testing.M) {
 	k8sClient = utils.CreateK8SClient(logger)
 
 	exitVal := m.Run()
-	logger.Info("finish to run all tests")
-
+	logger.Info("finish to run all tests, return auth server to regular mode")
+	K8sApply("./yamlFiles/deployAuthServer.yaml")
 	os.Exit(exitVal)
 }
 
@@ -116,6 +117,56 @@ func TestFlow3(t *testing.T) {
 
 }
 
+// test with 500 and 403 from sa auth server
+func TestRes500FromAuthServer(t *testing.T) {
+	t.Log("TestRes500FromAuthServer")
+	t.Cleanup(Cleanup)
+	g := NewWithT(t)
+	setCounterToZero(t)
+	//update auth server to err mode
+	t.Log("update auth server to err mode")
+	err := K8sApply("./yamlFiles/deployAuthServerErrMode.yaml")
+	g.Expect(err).NotTo(HaveOccurred())
+	time.Sleep(graceTime * time.Second)
+
+	//validate app deploy, serviceaccount, s3bucket not exsist
+	validateResourceStatus(t, false, false, false)
+	// apply to k8s app deploy, serviceaccount, s3bucket
+	err = K8sApply("./yamlFiles/testflow1.yaml")
+	g.Expect(err).NotTo(HaveOccurred())
+
+	time.Sleep(graceTimeAppChange * time.Second)
+
+	//check they created and running status
+	validateResourceStatus(t, true, true, true)
+	validateNumOfCallToAuthServer(t,5)
+
+
+}
+
+func TestRes403FromAuthServer(t *testing.T) {
+	t.Log("TestRes403FromAuthServer")
+	t.Cleanup(Cleanup)
+	g := NewWithT(t)
+	setCounterToZero(t)
+	//update auth server to unauth mode
+	t.Log("update auth server to unauth mode")
+	err := K8sApply("./yamlFiles/deployAuthServerUnauthMode.yaml")
+	g.Expect(err).NotTo(HaveOccurred())
+	time.Sleep(graceTimeAppChange * time.Second)
+	//validate app deploy, serviceaccount, s3bucket not exsist
+	validateResourceStatus(t, false, false, false)
+	// apply to k8s app deploy, serviceaccount, s3bucket
+	err = K8sApply("./yamlFiles/testflow1.yaml")
+	g.Expect(err).NotTo(HaveOccurred())
+
+	time.Sleep(graceTimeAppChange * time.Second)
+
+	//check they created and running status
+	validateResourceStatus(t, true, true, true)
+	validateNumOfCallToAuthServer(t,1)
+
+}
 func validateResourceStatus(t *testing.T, expectDeploy bool, expectSA bool, expectBucket bool) {
 	g := NewWithT(t)
 	deploy := appsv1.Deployment{}
@@ -143,6 +194,32 @@ func validateResourceStatus(t *testing.T, expectDeploy bool, expectSA bool, expe
 	} else {
 		g.Expect(err).To(HaveOccurred())
 	}
+
+}
+
+func validateNumOfCallToAuthServer(t *testing.T, expectNumOfCall int){
+	g := NewWithT(t)
+	resp, err := http.Get(pathToAuthServer+"/counter")
+	g.Expect(err).NotTo(HaveOccurred())
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	t.Log(string(body))
+	c := map[string]int{}
+	json.Unmarshal(body,&c)
+	t.Log(c)
+
+	g.Expect(expectNumOfCall).Should(Equal(c["counter"]))
+
+}
+func setCounterToZero(t *testing.T){
+	g := NewWithT(t)
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodPatch,pathToAuthServer+"/counter",nil)
+	g.Expect(err).NotTo(HaveOccurred())
+	resp, err := client.Do(req)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(resp.StatusCode).Should(Equal(200))
 
 }
 
