@@ -2,9 +2,9 @@ package tests
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
+	// "encoding/json"
+	// "io/ioutil"
+	// "net/http"
 	"os"
 	"os/exec"
 	"testing"
@@ -62,7 +62,7 @@ func TestFlow1(t *testing.T) {
 	g := NewWithT(t)
 	t.Cleanup(Cleanup)
 	//validate app deploy, serviceaccount, s3bucket not exsist
-	validateResourceStatus(t, false, false, false)
+	validateResourceStatus(t, false, false, false, false)
 
 	// apply to k8s app deploy, serviceaccount, s3bucket
 	err := K8sApply("./yamlFiles/testflow1.yaml")
@@ -71,7 +71,7 @@ func TestFlow1(t *testing.T) {
 	time.Sleep(graceTime * time.Second)
 
 	//check they created and running status
-	validateResourceStatus(t, true, true, true)
+	validateResourceStatus(t, true, true, true, true)
 
 }
 
@@ -85,13 +85,13 @@ func TestFlow2(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	//validate begin status
 	time.Sleep(graceTime * time.Second)
-	validateResourceStatus(t, true, false, false)
+	validateResourceStatus(t, true, false, false, true)
 	// apply to k8s app deploy, serviceaccount, s3bucket
 	err = K8sApply("./yamlFiles/testflow2-update.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTime * time.Second)
 
-	validateResourceStatus(t, true, true, true)
+	validateResourceStatus(t, true, true, true, true)
 	//check they created and running status
 
 }
@@ -106,13 +106,13 @@ func TestFlow3(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	//validate begin status
 	time.Sleep(graceTime * time.Second)
-	validateResourceStatus(t, true, true, false)
+	validateResourceStatus(t, true, true, false, true)
 	// apply to k8s app deploy, serviceaccount, s3bucket
 	err = K8sApply("./yamlFiles/testflow3-update.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTime * time.Second)
 
-	validateResourceStatus(t, true, true, true)
+	validateResourceStatus(t, true, true, true, true)
 	//check they created and running status
 
 }
@@ -122,17 +122,14 @@ func TestRes500FromAuthServer(t *testing.T) {
 	t.Log("TestRes500FromAuthServer")
 	t.Cleanup(Cleanup)
 	g := NewWithT(t)
-	setCounterToZero(t)
+	// setCounterToZero(t)
 	//update auth server to err mode
 	t.Log("update auth server to err mode")
 	err := K8sApply("./yamlFiles/deployAuthServerErrMode.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTime * time.Second)
-	setCounterToZero(t)
-
-
 	//validate app deploy, serviceaccount, s3bucket not exsist
-	validateResourceStatus(t, false, false, false)
+	validateResourceStatus(t, false, false, false, false)
 	// apply to k8s app deploy, serviceaccount, s3bucket
 	err = K8sApply("./yamlFiles/testflow1.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
@@ -140,7 +137,7 @@ func TestRes500FromAuthServer(t *testing.T) {
 	time.Sleep(graceTimeAppChange * time.Second)
 
 	//check they created and running status
-	validateResourceStatus(t, true, false, true)
+	validateResourceStatus(t, true, false, true, false)
 	// validateNumOfCallToAuthServer(t, 5)
 
 }
@@ -149,14 +146,14 @@ func TestRes403FromAuthServer(t *testing.T) {
 	t.Log("TestRes403FromAuthServer")
 	t.Cleanup(Cleanup)
 	g := NewWithT(t)
-	setCounterToZero(t)
+	// setCounterToZero(t)
 	//update auth server to unauth mode
 	t.Log("update auth server to unauth mode")
 	err := K8sApply("./yamlFiles/deployAuthServerUnauthMode.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTimeAppChange * time.Second)
 	//validate app deploy, serviceaccount, s3bucket not exsist
-	validateResourceStatus(t, false, false, false)
+	validateResourceStatus(t, false, false, false,false)
 	// apply to k8s app deploy, serviceaccount, s3bucket
 	err = K8sApply("./yamlFiles/testflow1.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
@@ -164,11 +161,11 @@ func TestRes403FromAuthServer(t *testing.T) {
 	time.Sleep(graceTimeAppChange * time.Second)
 
 	//check they created and running status
-	validateResourceStatus(t, true, false, true)
+	validateResourceStatus(t, true, false, true, false)
 	// validateNumOfCallToAuthServer(t, 1)
 
 }
-func validateResourceStatus(t *testing.T, expectDeploy bool, expectSA bool, expectBucket bool) {
+func validateResourceStatus(t *testing.T, expectDeploy bool, expectSA bool, expectBucket bool, expectPods bool) {
 	g := NewWithT(t)
 	deploy := appsv1.Deployment{}
 	err := k8sClient.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: appName}, &deploy)
@@ -176,7 +173,12 @@ func validateResourceStatus(t *testing.T, expectDeploy bool, expectSA bool, expe
 	if expectDeploy {
 
 		g.Expect(err).NotTo(HaveOccurred())
-		// g.Expect(deploy.Status.AvailableReplicas).Should(Equal(*deploy.Spec.Replicas))
+		if expectPods {
+			g.Expect(deploy.Status.AvailableReplicas).Should(Equal(*deploy.Spec.Replicas))
+		} else {
+			g.Expect(deploy.Status.AvailableReplicas).Should(Equal(int32(0)))
+
+		}
 	} else {
 		g.Expect(err).To(HaveOccurred())
 	}
@@ -198,31 +200,31 @@ func validateResourceStatus(t *testing.T, expectDeploy bool, expectSA bool, expe
 
 }
 
-func validateNumOfCallToAuthServer(t *testing.T, expectNumOfCall int) {
-	g := NewWithT(t)
-	resp, err := http.Get(pathToAuthServer + "/counter")
-	g.Expect(err).NotTo(HaveOccurred())
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	g.Expect(err).NotTo(HaveOccurred())
-	t.Log(string(body))
-	c := map[string]int{}
-	json.Unmarshal(body, &c)
-	t.Log(c)
+// func validateNumOfCallToAuthServer(t *testing.T, expectNumOfCall int) {
+// 	g := NewWithT(t)
+// 	resp, err := http.Get(pathToAuthServer + "/counter")
+// 	g.Expect(err).NotTo(HaveOccurred())
+// 	defer resp.Body.Close()
+// 	body, err := ioutil.ReadAll(resp.Body)
+// 	g.Expect(err).NotTo(HaveOccurred())
+// 	t.Log(string(body))
+// 	c := map[string]int{}
+// 	json.Unmarshal(body, &c)
+// 	t.Log(c)
 
-	g.Expect(expectNumOfCall).Should(Equal(c["counter"]))
+// 	g.Expect(expectNumOfCall).Should(Equal(c["counter"]))
 
-}
-func setCounterToZero(t *testing.T) {
-	g := NewWithT(t)
-	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodPatch, pathToAuthServer+"/counter", nil)
-	g.Expect(err).NotTo(HaveOccurred())
-	resp, err := client.Do(req)
-	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(resp.StatusCode).Should(Equal(200))
+// }
+// func setCounterToZero(t *testing.T) {
+// 	g := NewWithT(t)
+// 	client := &http.Client{}
+// 	req, err := http.NewRequest(http.MethodPatch, pathToAuthServer+"/counter", nil)
+// 	g.Expect(err).NotTo(HaveOccurred())
+// 	resp, err := client.Do(req)
+// 	g.Expect(err).NotTo(HaveOccurred())
+// 	g.Expect(resp.StatusCode).Should(Equal(200))
 
-}
+// }
 
 func Cleanup() {
 	logger.Info("cleanup function")

@@ -217,11 +217,11 @@ func (k *K8sClient) setBody(namespace string, labelsFromS3 map[string]string) *b
 		k.Log.Error(err, "error to get config map")
 		return nil
 	}
-	// appPods := v1.PodList{}
-	// err = k.getPodList(namespace, labelsFromS3, &appPods)
+
 	deploy := appsv1.Deployment{}
 	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &deploy)
 	if err != nil {
+		k.Log.Error(err,"error to get deployment", "deploy_name",labelsFromS3["app"] )
 		return nil
 	}
 	dataMap := cerateMapForBody(cm.Data, deploy, k.Log)
