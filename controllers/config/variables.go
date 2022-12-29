@@ -74,7 +74,7 @@ func init() {
 			panic(fmt.Sprintf("error on parsing resourcePerPage:[%v]", err))
 		}
 	} else {
-		waitBackoffDuration = 1
+		waitBackoffDuration = 2
 	}
 	if WBFString := os.Getenv("WAIT_BACKOF_FACTOR"); WBFString != "" {
 		waitBackoffFactor, err = strconv.ParseFloat(WBFString, 64)

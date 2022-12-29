@@ -10,6 +10,7 @@ import (
 
 	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	"github.com/go-logr/logr"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,20 +35,27 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 		sa, err = k.createServiceAccount(serviceAcountName, namespace, iamRole)
 		if err == nil {
 			k.Log.Info("succseded to create new service account")
-			wait.ExponentialBackoff(wait.Backoff{Duration: config.WaitBackoffDuration(), Factor: config.WaitBackoffFactor(), Steps: config.WaitBackoffSteps()}, func() (done bool, err error) {
+			err = wait.ExponentialBackoff(wait.Backoff{Duration: config.WaitBackoffDuration(), Factor: config.WaitBackoffFactor(), Steps: config.WaitBackoffSteps()}, func() (done bool, err error) {
 				err = k.checkMatchingAppToServiceAccount(serviceAcountName, s3Selector, namespace)
-				return err == nil, nil
+				k.Log.Info("in ExponentialBackoff checkMatchingAppToServiceAccount", "WaitBackoffDuration", config.WaitBackoffDuration(), "factor", config.WaitBackoffFactor(), "steps", config.WaitBackoffSteps(), "err", err)
+				return err == nil, err
 			})
 			// after service account created
 			if err != nil {
 				k.Log.Error(err, "error service account is not match to app")
 				k.deleteServiceAccount(sa)
-			} else {// adding to service account to auth server
-				wait.ExponentialBackoff(wait.Backoff{Duration: config.WaitBackoffDuration(), Factor: config.WaitBackoffFactor(), Steps: config.WaitBackoffSteps()}, func() (done bool, err error) {
-					statuscode, err := k.addSAToAuthServer(serviceAcountName, namespace, s3Selector)
-					return err == nil || statuscode == 403, nil
+			} else { // adding to service account to auth server
+				var statuscode int
+				err = wait.ExponentialBackoff(wait.Backoff{Duration: config.WaitBackoffDuration(), Factor: config.WaitBackoffFactor(), Steps: config.WaitBackoffSteps()}, func() (done bool, err error) {
+					statuscode, err = k.addSAToAuthServer(serviceAcountName, namespace, s3Selector)
+					k.Log.Info("in ExponentialBackoff", "statuscode", statuscode, "err", err)
+					if statuscode == 403 {
+						return true, err
+					}
+					return err == nil, err
 				})
-				if err != nil {// didnt succeded to add service account to auth server
+				k.Log.Info("test error", "stat", err != nil, "err", err, "statuscode", statuscode)
+				if err != nil { // didnt succeded to add service account to auth server
 					k.Log.Error(err, "error to add service account to auth server")
 					k.deleteServiceAccount(sa)
 				}
@@ -123,25 +131,38 @@ func (k *K8sClient) editServiceAccount(serviceAcountName string, namespace strin
 }
 
 func (k *K8sClient) checkMatchingAppToServiceAccount(SAName string, labelsFromS3 map[string]string, namespace string) error {
-	appPods := v1.PodList{}
-	//get all pods in namespace that match the labels
-	err := k.getPodList(namespace, labelsFromS3, &appPods)
-	if err == nil {
-		for _, appPod := range appPods.Items {
-			if appPod.Spec.ServiceAccountName != SAName {
-				err = errors.New("app ServiceAccountName not match s3resource service account name")
-				k.Log.Error(err, "app ServiceAccountName not match s3resource service account name", "appPod.Spec.ServiceAccountName", appPod.Spec.ServiceAccountName, "s3-resouce SA", SAName)
-				return err
+	k.Log.V(1).Info("checkMatchingAppToServiceAccount", "service account name", SAName, "labelsFromS3", labelsFromS3)
+
+	noMatchError := errors.New("app ServiceAccountName not match s3resource service account name")
+	k.Log.Info("looking for matching deployment", "deploy_name", labelsFromS3["app"])
+
+	deploy := appsv1.Deployment{}
+	err := k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &deploy)
+	if err == nil { //succeded to find deployment
+		if deploy.Spec.Template.Spec.ServiceAccountName == SAName {
+			k.Log.Info("service account is match to app", "serviceaccount name", SAName, "labels", labelsFromS3)
+			return nil
+		}
+	} else { //didnt succeded to get deployment looks for pods
+		//get all pods in namespace that match the labels
+		appPods := v1.PodList{}
+		err = k.getPodList(namespace, labelsFromS3, &appPods)
+		if err == nil {
+			for _, appPod := range appPods.Items {
+				if appPod.Spec.ServiceAccountName != SAName {
+					err = noMatchError
+					k.Log.Error(err, "app ServiceAccountName not match s3resource service account name", "appPod.Spec.ServiceAccountName", appPod.Spec.ServiceAccountName, "s3-resouce SA", SAName)
+					return err
+				}
+				k.Log.Info("service account is match to app", "serviceaccount name", SAName, "labels", labelsFromS3)
 			}
 		}
-		k.Log.Info("service account is match to app", "serviceaccount name", SAName, "labels", labelsFromS3)
 	}
-
 	return err
 }
 
 func (k *K8sClient) deleteServiceAccount(sa *v1.ServiceAccount) error {
-
+	k.Log.Info("Delete service account", "serviceaccount name", sa.Name)
 	err := k.Delete(context.Background(), sa)
 	if err != nil {
 		k.Log.Error(err, "error to delete service account", "serviceaccount name", sa.Name)
@@ -185,8 +206,8 @@ func (k *K8sClient) addSAToAuthServer(SAName string, namespace string, labelsFro
 		k.Log.Error(err, "error to read body")
 		return 0, err
 	}
+	return 	validateResponse(res.StatusCode, string(resBody), k.Log)
 
-	return validateResponse(res.StatusCode, string(resBody), k.Log)
 }
 
 func (k *K8sClient) setBody(namespace string, labelsFromS3 map[string]string) *bytes.Reader {
@@ -196,12 +217,14 @@ func (k *K8sClient) setBody(namespace string, labelsFromS3 map[string]string) *b
 		k.Log.Error(err, "error to get config map")
 		return nil
 	}
-	appPods := v1.PodList{}
-	err = k.getPodList(namespace, labelsFromS3, &appPods)
+	// appPods := v1.PodList{}
+	// err = k.getPodList(namespace, labelsFromS3, &appPods)
+	deploy := appsv1.Deployment{}
+	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &deploy)
 	if err != nil {
 		return nil
 	}
-	dataMap := cerateMapForBody(cm.Data, appPods.Items[0], k.Log)
+	dataMap := cerateMapForBody(cm.Data, deploy, k.Log)
 
 	body := convertMapToByte(dataMap, k.Log)
 	return body
