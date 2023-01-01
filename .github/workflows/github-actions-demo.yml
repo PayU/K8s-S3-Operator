@@ -43,7 +43,8 @@ jobs:
 
       - name: deploy controller
         run: make deploy
-
+      - name: show context
+        run: kubectl config current-context
       - name: deploy ingress controller
         run: make deploy-ingress-controller
 
