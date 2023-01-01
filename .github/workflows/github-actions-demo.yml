@@ -1,5 +1,5 @@
 name: ci tests
-run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
+run-name: ${{ github.actor }}in branch ${{ github.ref }} is testing out GitHub Actions 🚀
 on: [push]
 jobs:
   Setup-and-tests:
@@ -24,7 +24,7 @@ jobs:
           cluster_name: s3operator-cluster
           config: ./hack/kindConfig.yaml
       - uses: docker-practice/actions-setup-docker@master
-      
+
       - name: Build Docker image
         run: make docker-build
 
