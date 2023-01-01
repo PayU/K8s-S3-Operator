@@ -40,9 +40,9 @@ jobs:
           config: ./hack/kindConfig.yaml
       - uses: docker-practice/actions-setup-docker@master
       - name: Build Docker image
-        run: docker build -t controller:tilt .
+        run: make docker-build
       - name: Load Docker image into Kind cluster
-        run: kind load docker-image --name s3operator-cluster controller:tilt
+        run: make kind-load-controller
   
 
       - name: deploy controller
