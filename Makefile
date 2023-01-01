@@ -188,7 +188,7 @@ kind-load-integration-tests-app:
 
 .PHONY: build-integration-tests-app
 build-integration-tests-app:
-	cd ./tests/integrationTests
+	cd ./tests/integrationTests/testApp
 	docker build -t $(INTEGRATION_TESTS_APP_IMG) -f ./appTest.Dockerfile . 
 
 .PHONY: deploy-system-test-app
