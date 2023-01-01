@@ -32,6 +32,7 @@ var s3Bucket s3operatorv1.S3Bucket
 var graceTime = time.Duration(5)
 var serviceAccountName = "system-test-serviceaccount"
 var appName = "system-test-app"
+var MACHINE_IP = os.Getenv("MACHINE_IP")
 
 func TestMain(m *testing.M) {
 	// run local env script befor test
@@ -45,7 +46,9 @@ func TestMain(m *testing.M) {
 	ses := awsClient.CreateSession(&logger)
 	s3Client = awsClient.SetS3Client(&logger, ses)
 	s3Client.Endpoint = "http://localhost:4566/localstack"
-
+	if MACHINE_IP != "" {
+		s3Client.Endpoint = "http://" + MACHINE_IP + ":4566/localstack"
+	}
 	k8sClient = utils.CreateK8SClient(logger)
 
 	s3Bucket = s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: bucketName, Namespace: namespace},

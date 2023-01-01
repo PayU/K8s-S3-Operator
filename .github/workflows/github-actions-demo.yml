@@ -20,6 +20,14 @@ jobs:
   Create-Kind-Cluster:
     runs-on: ubuntu-latest
     steps:
+      - name: Export IP address
+        run: |
+          MACHINE_IP=$(ip a | grep eth0 | awk '{print $2}')
+          echo "MACHINE_IP=$MACHINE_IP" >> $GITHUB_ENV
+          export MACHINE_IP
+      - name: Print IP address
+        run: echo "The IP address is $MACHINE_IP
+        
       - uses: actions/checkout@v2
       - name: Set up Go
         uses: actions/setup-go@v2
