@@ -44,9 +44,13 @@ jobs:
       - name: deploy controller
         run: make deploy
 
+      - name: deploy ingress controller
+        run: make deploy-ingress-controller
+
       - name: Run make
         run: make run-local-aws-on-cluster
-
+      - name: Run make deploy system app
+        run: make deploy-system-test-app
   # Deploy-ingress:
   #   needs: Create-Kind-Cluster
   #   runs-on: ubuntu-latest
