@@ -46,7 +46,7 @@ jobs:
       - name: show context
         run: kubectl config current-context
       - name: deploy ingress controller
-        run: make deploy-ingress-controller
+        run: ./hack/scripts/deploy-ingress.sh
 
       - name: Run make
         run: make run-local-aws-on-cluster
