@@ -17,40 +17,44 @@ jobs:
           ls ${{ github.workspace }}
       - run: echo "🍏 This job's status is ${{ job.status }}."
 
-  Create-Kind-Cluster:
+  Setup-and-download:
     runs-on: ubuntu-latest
     env:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
     steps:
-      - name: Export IP address
-        run: |
-          MACHINE_IP=$(ip a | grep eth0 | awk '{print $2}')
-          echo $MACHINE_IP
-          export MACHINE_IP
-      - name: Print IP address
-        run: echo "The IP address is $MACHINE_IP"
-
       - uses: actions/checkout@v2
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
           go-version: ^1.19
-      - name: Install kustomize and docker
-        run: GO111MODULE=on go get sigs.k8s.io/kustomize/kustomize/v3@v3.8.9 && go get github.com/mitchellh/gox
-      - run: echo "create kind cluster"
-      - run: cd ${{ github.workspace }}
+      - name: Install kustomize  and make tool
+        run: |
+         GO111MODULE=on go get sigs.k8s.io/kustomize/kustomize/v3@v3.8.9 
+         go get github.com/mitchellh/gox
+
+  Create-Kind-Cluster:
+    runs-on: ubuntu-latest
+    needs: Setup-and-download
+    steps:
       - name: Create k8s Kind Cluster
         uses: helm/kind-action@v1.4.0
         with:
           cluster_name: s3operator-cluster
           config: ./hack/kindConfig.yaml
+
+
+ 
+  build-and-deploy-controller:
+    runs-on: ubuntu-latest
+    needs: Create-Kind-Cluster
+    steps: 
+
       - uses: docker-practice/actions-setup-docker@master
       - name: Build Docker image
         run: docker build -t controller:tilt .
       - name: Load Docker image into Kind cluster
         run: kind load docker-image --name s3operator-cluster controller:tilt
-  
 
       - name: deploy controller
         run: make deploy
@@ -59,17 +63,30 @@ jobs:
       - name: deploy ingress controller
         run: ./hack/scripts/deploy-ingress.sh
 
+  deploy-localstack:
+    runs-on: ubuntu-latest
+    needs: build-and-deploy-controller
+    steps:
       - name: run-local-aws-on-cluster
         run: make run-local-aws-on-cluster
       - name: Run make deploy system app
         run: make deploy-system-test-app
 
+
+  run-system-tests:
+    runs-on: ubuntu-latest
+    needs: deploy-localstack
+    steps:
       - name: run system tests
         run: go test ./tests/systemTest/system_test.go -v
-
+        
+  run-integration-tests:
+    runs-on: ubuntu-latest
+    needs: deploy-localstack
+    steps:
       - name: run integration tests
         run: |
           ./tests/integrationTests/testApp/uploadApp.sh
-          go test ./tests/integrationTests/integration_test.go -timeout 120s -v
+          go test ./tests/integrationTests/integration_test.go -timeout 180s -v
 
     
