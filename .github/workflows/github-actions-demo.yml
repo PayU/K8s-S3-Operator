@@ -23,11 +23,11 @@ jobs:
       - name: Export IP address
         run: |
           MACHINE_IP=$(ip a | grep eth0 | awk '{print $2}')
-          echo "MACHINE_IP=$MACHINE_IP" >> $GITHUB_ENV
+          echo MACHINE_IP
           export MACHINE_IP
       - name: Print IP address
         run: echo "The IP address is $MACHINE_IP
-        
+
       - uses: actions/checkout@v2
       - name: Set up Go
         uses: actions/setup-go@v2
