@@ -26,7 +26,7 @@ jobs:
         with:
           go-version: ^1.19
       - name: Install kustomize and docker
-        run: GO111MODULE=on go get sigs.k8s.io/kustomize/kustomize/v3@v3.8.9 && go get github.com/docker/docker/v22.0.0-ce
+        run: GO111MODULE=on go get sigs.k8s.io/kustomize/kustomize/v3@v3.8.9
       - run: echo "create kind cluster"
       - run: cd ${{ github.workspace }}
       - name: Create k8s Kind Cluster
@@ -34,6 +34,7 @@ jobs:
         with:
           cluster_name: s3operator-cluster
           config: ./hack/kindConfig.yaml
+      - uses: docker-practice/actions-setup-docker@master
       - name: Build Docker image
         run: docker build -t controller:tilt .
       - name: Load Docker image into Kind cluster
