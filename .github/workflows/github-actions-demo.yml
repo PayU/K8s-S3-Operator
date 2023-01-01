@@ -39,12 +39,13 @@ jobs:
         run: docker build -t controller:tilt .
       - name: Load Docker image into Kind cluster
         run: kind load docker-image --name s3operator-cluster controller:tilt
-      - name: Run make
-        run: make run-local-aws-on-cluster
+  
 
       - name: deploy controller
-        run: cd config/manager && kustomize edit set image controller=controller:tilt &&
-         cd ../.. && kustomize build config/default | kubectl apply -f -
+        run: make deploy
+
+      - name: Run make
+        run: make run-local-aws-on-cluster
 
   # Deploy-ingress:
   #   needs: Create-Kind-Cluster
