@@ -40,7 +40,8 @@ type S3BucketReconciler struct {
 }
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=serviceaccounts;pods;configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=serviceaccounts;pods;configmaps;deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=s3operator.payu.com,resources=s3buckets/finalizers,verbs=update

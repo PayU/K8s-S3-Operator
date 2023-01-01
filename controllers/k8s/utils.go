@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	v1 "k8s.io/api/core/v1"
+	// v1 "k8s.io/api/core/v1"
 )
 
 
@@ -27,7 +27,7 @@ func validateResponse(statusCode int, body string, Log *logr.Logger)(int, error)
 	return statusCode, nil
 }
 
-func cerateMapForBody(dataMap map[string]string, appPod v1.Pod, Log *logr.Logger) map[string]string {
+func cerateMapForBody(dataMap map[string]string, appPod interface{}, Log *logr.Logger) map[string]string {
 	for key, val := range dataMap {
 		Log.V(1).Info("inside loop of setBody", "key", key, "val", val)
 		val, err := getValue(val, appPod, Log)
@@ -54,7 +54,7 @@ func convertMapToByte(dataMap map[string]string, Log *logr.Logger) *bytes.Reader
 
 }
 
-func getValue(key string, obj v1.Pod,Log *logr.Logger) (interface{}, error) {
+func getValue(key string, obj interface{}, Log *logr.Logger) (interface{}, error) {
 	var val reflect.Value
 	var err error
 	// Use the recover function to handle panics.
