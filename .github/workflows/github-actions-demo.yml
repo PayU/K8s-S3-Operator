@@ -26,7 +26,7 @@ jobs:
         with:
           go-version: ^1.19
       - name: Install kustomize and docker
-        run: GO111MODULE=on go get sigs.k8s.io/kustomize/kustomize/v3@v3.8.9
+        run: GO111MODULE=on go get sigs.k8s.io/kustomize/kustomize/v3@v3.8.9 && go get github.com/mitchellh/gox
       - run: echo "create kind cluster"
       - run: cd ${{ github.workspace }}
       - name: Create k8s Kind Cluster
@@ -39,18 +39,20 @@ jobs:
         run: docker build -t controller:tilt .
       - name: Load Docker image into Kind cluster
         run: kind load docker-image --name s3operator-cluster controller:tilt
+      - name: Run make
+        run: make run-local-aws-on-cluster
 
       - name: deploy controller
         run: cd config/manager && kustomize edit set image controller=controller:tilt &&
          cd ../.. && kustomize build config/default | kubectl apply -f -
 
-  Deploy-ingress:
-    needs: Create-Kind-Cluster
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install make
-        run: GO111MODULE=on go get github.com/mitchellh/gox
-      - name: Run make
-        run: make run-local-aws-on-cluster
+  # Deploy-ingress:
+  #   needs: Create-Kind-Cluster
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Install make
+  #       run: GO111MODULE=on go get github.com/mitchellh/gox
+  #     - name: Run make
+  #       run: make run-local-aws-on-cluster
 
     
