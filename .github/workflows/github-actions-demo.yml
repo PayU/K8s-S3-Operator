@@ -20,10 +20,15 @@ jobs:
   Create-Kind-Cluster:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.19
       - run: echo "create kind cluster"
       - run: cd ${{ github.workspace }}
       - name: Create k8s Kind Cluster
         uses: helm/kind-action@v1.4.0
         with:
-          cluster_name: 
-          config-path: ./hack/kindConfig.yaml
+          cluster_name: s3operator-cluster
+          config: ./hack/kindConfig.yaml
