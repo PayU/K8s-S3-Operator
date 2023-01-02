@@ -11,6 +11,13 @@ rules:
   - configmaps
   - deployments
   - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - serviceaccounts
   verbs:
   - create
@@ -23,14 +30,20 @@ rules:
 - apiGroups:
   - apps
   resources:
+  - daemonsets
   - deployments
+  - statefulsets
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - s3operator.payu.com

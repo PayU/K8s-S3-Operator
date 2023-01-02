@@ -11,8 +11,10 @@ import (
 	utils "github.com/PayU/K8s-S3-Operator/tests/utils"
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -20,10 +22,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-/*integration test will test 3 flows.
-1. app not exsist, serviceaccount not exsist, s3bucket not exsist
+/*integration test will test 8 flows.
+1. app not exsist, serviceaccount not exsist, s3bucket not exsist deploy app with Deployment
 2. app already run with default serviceaccount, s3bucket not exsist => new deploy of bucket and update app serviceaccount
 3. app already run with serviceaccount, s3bucket not exsist => deploy of bucket will update serviceaccount annotation
+4. app not exsist, serviceaccount not exsist, s3bucket not exsist deploy app with statefullset
+5. app not exsist, serviceaccount not exsist, s3bucket not exsist deploy app with Job
+6. app not exsist, serviceaccount not exsist, s3bucket not exsist deploy app with DaemonSet
 */
 
 var k8sClient client.Client
@@ -59,14 +64,14 @@ func TestFlow1(t *testing.T) {
 	g := NewWithT(t)
 	t.Cleanup(Cleanup)
 	//validate app deploy, serviceaccount, s3bucket not exsist
-	validateResourceStatus(t, false, false, false, false)
+	validateResourceStatus(t, false, false, false, false, "deploy")
 
 	// apply to k8s app deploy, serviceaccount, s3bucket
 	err := K8sApply("./yamlFiles/testflow1.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 
 	//check they created and running status
-	validateResourceStatus(t, true, true, true, true)
+	validateResourceStatus(t, true, true, true, true, "deploy")
 
 }
 
@@ -79,12 +84,12 @@ func TestFlow2(t *testing.T) {
 	err := K8sApply("./yamlFiles/tesflow2-start.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 	//validate begin status
-	validateResourceStatus(t, true, false, false, true)
+	validateResourceStatus(t, true, false, false, true, "deploy")
 	// apply to k8s app deploy, serviceaccount, s3bucket
 	err = K8sApply("./yamlFiles/testflow2-update.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 
-	validateResourceStatus(t, true, true, true, true)
+	validateResourceStatus(t, true, true, true, true, "deploy")
 	//check they created and running status
 
 }
@@ -98,13 +103,67 @@ func TestFlow3(t *testing.T) {
 	err := K8sApply("./yamlFiles/testflow3-start.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 	//validate begin status
-	validateResourceStatus(t, true, true, false, true)
+	validateResourceStatus(t, true, true, false, true, "deploy")
 	// apply to k8s app deploy, serviceaccount, s3bucket
 	err = K8sApply("./yamlFiles/testflow3-update.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 
-	validateResourceStatus(t, true, true, true, true)
+	validateResourceStatus(t, true, true, true, true, "deploy")
 	//check they created and running status
+
+}
+
+// 4. app not exsist, serviceaccount not exsist, s3bucket not exsist deploy app with statefullset
+func TestFlow4(t *testing.T) {
+	t.Log("TestFlow4")
+
+	g := NewWithT(t)
+	t.Cleanup(CleanupStatefulSet)
+	//validate app deploy, serviceaccount, s3bucket not exsist
+	validateResourceStatus(t, false, false, false, false, "statefulSet")
+
+	// apply to k8s app deploy, serviceaccount, s3bucket
+	err := K8sApply("./yamlFiles/testflow4.yaml")
+	g.Expect(err).NotTo(HaveOccurred())
+
+	//check they created and running status
+	validateResourceStatus(t, true, true, true, true, "statefulSet")
+
+}
+
+// 5. app not exsist, serviceaccount not exsist, s3bucket not exsist deploy app with Job
+func TestFlow5(t *testing.T) {
+	t.Log("TestFlow5")
+
+	g := NewWithT(t)
+	t.Cleanup(CleanupJob)
+	//validate app deploy, serviceaccount, s3bucket not exsist
+	validateResourceStatus(t, false, false, false, false, "job")
+
+	// apply to k8s app deploy, serviceaccount, s3bucket
+	err := K8sApply("./yamlFiles/testflow5.yaml")
+	g.Expect(err).NotTo(HaveOccurred())
+
+	//check they created and running status
+	validateResourceStatus(t, true, true, true, true, "job")
+
+}
+
+// 6. app not exsist, serviceaccount not exsist, s3bucket not exsist deploy app with DaemonSet
+func TestFlow6(t *testing.T) {
+	t.Log("TestFlow6")
+
+	g := NewWithT(t)
+	t.Cleanup(CleanupDemonSet)
+	//validate app deploy, serviceaccount, s3bucket not exsist
+	validateResourceStatus(t, false, false, false, false, "demonset")
+
+	// apply to k8s app deploy, serviceaccount, s3bucket
+	err := K8sApply("./yamlFiles/testflow6.yaml")
+	g.Expect(err).NotTo(HaveOccurred())
+
+	//check they created and running status
+	validateResourceStatus(t, true, true, true, true, "demonset")
 
 }
 
@@ -120,13 +179,13 @@ func TestRes500FromAuthServer(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTime * time.Second)
 	//validate app deploy, serviceaccount, s3bucket not exsist
-	validateResourceStatus(t, false, false, false, false)
+	validateResourceStatus(t, false, false, false, false, "deploy")
 	// apply to k8s app deploy, serviceaccount, s3bucket
 	err = K8sApply("./yamlFiles/testflow1.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 
 	//check they created and running status
-	validateResourceStatus(t, true, false, true, false)
+	validateResourceStatus(t, true, false, true, false, "deploy")
 
 }
 
@@ -140,7 +199,7 @@ func TestRes403FromAuthServer(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTime * time.Second)
 	//validate app deploy, serviceaccount, s3bucket not exsist
-	validateResourceStatus(t, false, false, false, false)
+	validateResourceStatus(t, false, false, false, false, "deploy")
 	// apply to k8s app deploy, serviceaccount, s3bucket
 	err = K8sApply("./yamlFiles/testflow1.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
@@ -148,17 +207,33 @@ func TestRes403FromAuthServer(t *testing.T) {
 	// time.Sleep(graceTimeAppChange * time.Second)
 
 	//check they created and running status
-	validateResourceStatus(t, true, false, true, false)
+	validateResourceStatus(t, true, false, true, false, "deploy")
 	// validateNumOfCallToAuthServer(t, 1)
 
 }
-func validateResourceStatus(t *testing.T, expectDeploy bool, expectSA bool, expectBucket bool, expectPods bool) {
+func validateResourceStatus(t *testing.T, expectPodController bool, expectSA bool, expectBucket bool, expectPods bool, podController string) {
 	// g := NewWithT(t)
+	switch podController {
+	case "deploy":
+		deploy := appsv1.Deployment{}
+		getResourceEventually(t, &deploy, expectPodController, appName)
+		if expectPodController {
+			checkPods(t, expectPods)
+		}
+	case "statefulSet":
+		sts := appsv1.StatefulSet{}
+		getResourceEventually(t, &sts, expectPodController, appName)
+		if expectPodController {
+			checkPods(t, expectPods)
+		}
+	case "job":
+		job := batchv1.Job{}
+		getResourceEventually(t, &job, expectPodController, appName)
 
-	deploy := appsv1.Deployment{}
-	getResourceEventually(t, &deploy, expectDeploy, appName)
-	if expectDeploy {
-		checkPods(t,expectPods)
+	case "demonset":
+		demonset := appsv1.DaemonSet{}
+		getResourceEventually(t, &demonset, expectPodController, appName)
+		
 	}
 
 	sa := v1.ServiceAccount{}
@@ -168,23 +243,55 @@ func validateResourceStatus(t *testing.T, expectDeploy bool, expectSA bool, expe
 
 }
 
-
 func Cleanup() {
 	logger.Info("cleanup function")
+	var err error
+
 	deploy := appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: appName, Namespace: namespace}}
+	err = k8sClient.Delete(context.Background(), &deploy)
+	HandleError(err, "error to delete deploy", "succeded to delete deploy")
+	cleanupSAandBucket()
+
+	logger.Info("finish cleanup")
+}
+func CleanupStatefulSet() {
+	logger.Info("cleanup function")
+	var err error
+	sts := appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: appName, Namespace: namespace}}
+	err = k8sClient.Delete(context.Background(), &sts)
+	HandleError(err, "error to delete StatefulSet", "succeded to delete StatefulSet")
+	cleanupSAandBucket()
+
+	logger.Info("finish cleanup")
+}
+func CleanupJob() {
+	logger.Info("cleanup function")
+	var err error
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: appName, Namespace: namespace}}
+	err = k8sClient.Delete(context.Background(), &job)
+	HandleError(err, "error to delete job", "succeded to delete job")
+	cleanupSAandBucket()
+
+	logger.Info("finish cleanup")
+}
+func CleanupDemonSet() {
+	logger.Info("cleanup function")
+	var err error
+	demonset := appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: appName, Namespace: namespace}}
+	err = k8sClient.Delete(context.Background(), &demonset)
+	HandleError(err, "error to delete demonset", "succeded to delete demonset")
+	cleanupSAandBucket()
+	logger.Info("finish cleanup")
+}
+func cleanupSAandBucket() {
+	var err error
 	sa := v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName, Namespace: namespace}}
 	s3Bucket := s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: s3BucketName, Namespace: namespace}}
-
-	err := k8sClient.Delete(context.Background(), &deploy)
-	HandleError(err, "error to delete deploy", "succeded to delete deploy")
-
 	err = k8sClient.Delete(context.Background(), &sa)
 	HandleError(err, "error to delete serviceaccount", "succeded to delete serviceaccount")
 
 	err = k8sClient.Delete(context.Background(), &s3Bucket)
 	HandleError(err, "error to delete bucket", "succeded to delete bucket")
-
-	logger.Info("finish cleanup")
 }
 func HandleError(err error, msgError string, msgSucc string) {
 	if err != nil {

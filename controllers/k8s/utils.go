@@ -16,7 +16,7 @@ import (
 
 
 
-func validateResponse(statusCode int, body string, Log *logr.Logger)(int, error) {
+func validateResponseFromAuthServer(statusCode int, body string, Log *logr.Logger)(int, error) {
 	if statusCode != 200 {
 		err := errors.New("didnt succeded to add service account")
 		Log.Error(err, "error from auth server", "statusCode", statusCode, "body", body)
