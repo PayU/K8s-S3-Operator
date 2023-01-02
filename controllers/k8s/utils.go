@@ -9,9 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
 	"github.com/go-logr/logr"
-	// v1 "k8s.io/api/core/v1"
 )
 
 
@@ -30,7 +28,7 @@ func validateResponse(statusCode int, body string, Log *logr.Logger)(int, error)
 func cerateMapForBody(dataMap map[string]string, appPod interface{}, Log *logr.Logger) map[string]string {
 	for key, val := range dataMap {
 		Log.V(1).Info("inside loop of setBody", "key", key, "val", val)
-		val, err := getValue(val, appPod, Log)
+		val, err := GetValue(val, appPod, Log)
 		if err != nil {
 			Log.Error(err, "error to get value")
 			return nil
@@ -54,7 +52,7 @@ func convertMapToByte(dataMap map[string]string, Log *logr.Logger) *bytes.Reader
 
 }
 
-func getValue(key string, obj interface{}, Log *logr.Logger) (interface{}, error) {
+func GetValue(key string, obj interface{}, Log *logr.Logger) (interface{}, error) {
 	var val reflect.Value
 	var err error
 	// Use the recover function to handle panics.

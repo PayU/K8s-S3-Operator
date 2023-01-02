@@ -2,7 +2,7 @@ name: ci tests
 run-name: ${{ github.actor }} in branch ${{ github.ref }} is testing out GitHub Actions 🚀
 on: [push]
 jobs:
-  Setup-and-tests:
+  system-and-integration-:
     runs-on: ubuntu-latest
     env:
       AWS_ACCESS_KEY_ID: test
