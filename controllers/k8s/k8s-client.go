@@ -15,7 +15,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -283,18 +282,4 @@ func (k *K8sClient) getConfigMap(configMapName string, namespace string) (*v1.Co
 	}
 
 	return cm, nil
-}
-func (k *K8sClient) getPodList(namespace string, labelsFromS3 map[string]string, appPods *v1.PodList) error {
-	//get all pods in namespace that match the labels
-	err := k.List(context.Background(), appPods, &client.ListOptions{Namespace: namespace, LabelSelector: labels.SelectorFromSet(labelsFromS3)})
-	if err != nil {
-		k.Log.Error(err, "error to list app pods", "labels", labelsFromS3)
-		return err
-	}
-	if len(appPods.Items) == 0 {
-		err = errors.New("no app match to labels")
-		k.Log.Error(err, "no app match to labels", "labels", labelsFromS3)
-		return err
-	}
-	return nil
 }
