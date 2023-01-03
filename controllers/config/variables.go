@@ -22,8 +22,9 @@ var TAG_PREFIX = "s3.operator/"
 var waitBackoffDuration int64
 var waitBackoffFactor float64
 var waitBackoffSteps int64
-
-
+var pathToToken string
+var SERVICE_ACCOUNT_APPROVAL_URL string
+var configMapName string
 
 func init() {
 	var err error
@@ -67,31 +68,39 @@ func init() {
 	} else {
 		devMode = false
 	}
-	if WBDString:= os.Getenv("WAIT_BACKOF_DURATION"); WBDString != ""{
-		waitBackoffDuration, err = strconv.ParseInt(WBDString, 10,64)
+	if WBDString := os.Getenv("WAIT_BACKOF_DURATION"); WBDString != "" {
+		waitBackoffDuration, err = strconv.ParseInt(WBDString, 10, 64)
 		if err != nil {
 			panic(fmt.Sprintf("error on parsing resourcePerPage:[%v]", err))
 		}
-	}else{
-		waitBackoffDuration = 1
+	} else {
+		waitBackoffDuration = 2
 	}
-	if WBFString := os.Getenv("WAIT_BACKOF_FACTOR"); WBFString != ""{
+	if WBFString := os.Getenv("WAIT_BACKOF_FACTOR"); WBFString != "" {
 		waitBackoffFactor, err = strconv.ParseFloat(WBFString, 64)
 		if err != nil {
 			panic(fmt.Sprintf("error on parsing resourcePerPage:[%v]", err))
 		}
-	}else{
+	} else {
 		waitBackoffFactor = 2
 
 	}
-	if WBSString := os.Getenv("WAIT_BACKOF_STEPS"); WBSString!= ""{
-		waitBackoffSteps, err = strconv.ParseInt(WBSString, 10,0)
+	if WBSString := os.Getenv("WAIT_BACKOF_STEPS"); WBSString != "" {
+		waitBackoffSteps, err = strconv.ParseInt(WBSString, 10, 0)
 		if err != nil {
 			panic(fmt.Sprintf("error on parsing resourcePerPage:[%v]", err))
 		}
-	}else{
+	} else {
 		waitBackoffSteps = 5
-
+	}
+	if pathToToken = os.Getenv("PATH_TO_TOKEN"); pathToToken == "" {
+		pathToToken = "/var/run/secrets/tokens/token"
+	}
+	if SERVICE_ACCOUNT_APPROVAL_URL = os.Getenv("SERVICE_ACCOUNT_APPROVAL_URL"); SERVICE_ACCOUNT_APPROVAL_URL == "" {
+		SERVICE_ACCOUNT_APPROVAL_URL = "http://auth-server-service.k8s-s3-operator-system:30000"
+	}
+	if configMapName = os.Getenv("CONFIG_MAP_NAME"); configMapName == "" {
+		configMapName = "k8s-s3-operator-config-map-body"
 	}
 }
 
@@ -127,12 +136,21 @@ func DevMode() bool {
 func TagPrefix() string {
 	return TAG_PREFIX
 }
-func WaitBackoffDuration()time.Duration{
+func WaitBackoffDuration() time.Duration {
 	return time.Duration(waitBackoffDuration) * time.Second
 }
-func WaitBackoffFactor()float64{
+func WaitBackoffFactor() float64 {
 	return waitBackoffFactor
 }
-func WaitBackoffSteps()int{
+func WaitBackoffSteps() int {
 	return int(waitBackoffSteps)
+}
+func PathToToken() string {
+	return pathToToken
+}
+func ServiceAccountApprovalUrl() string {
+	return SERVICE_ACCOUNT_APPROVAL_URL
+}
+func ConfigMapName() string {
+	return configMapName
 }

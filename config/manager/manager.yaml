@@ -41,6 +41,9 @@ spec:
         - /manager
         image: controller:local
         name: manager
+        volumeMounts:
+        - mountPath: /var/run/secrets/tokens
+          name: token
         livenessProbe:
           httpGet:
             path: /healthz
@@ -66,4 +69,21 @@ spec:
         - name: AWS_ACCESS_KEY_ID
           value: test
       serviceAccountName: k8s-s3-operator-controller-manager
+      volumes:
+      - name: token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 7200
       terminationGracePeriodSeconds: 10
+---
+kind: ConfigMap 
+apiVersion: v1 
+metadata:
+  name: config-map-body
+  namespace: k8s-s3-operator-system 
+data:
+  # Configuration values can be set as key-value properties
+  img: spec.spec.Containers[0].Image
+  serviceaccount: Spec.ServiceAccountName

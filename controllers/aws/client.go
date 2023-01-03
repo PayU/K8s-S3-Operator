@@ -3,7 +3,6 @@ package aws
 import (
 	"errors"
 	"net/http"
-
 	"github.com/PayU/K8s-S3-Operator/controllers/config"
 
 	"github.com/aws/aws-sdk-go/aws"
