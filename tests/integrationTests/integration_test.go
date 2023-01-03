@@ -212,7 +212,7 @@ func TestRes403FromAuthServer(t *testing.T) {
 
 }
 func validateResourceStatus(t *testing.T, expectPodController bool, expectSA bool, expectBucket bool, expectPods bool, podController string) {
-	// g := NewWithT(t)
+	g := NewWithT(t)
 	switch podController {
 	case "deploy":
 		deploy := appsv1.Deployment{}
@@ -240,6 +240,8 @@ func validateResourceStatus(t *testing.T, expectPodController bool, expectSA boo
 	getResourceEventually(t, &sa, expectSA, serviceAccountName)
 	s3Bucket := s3operatorv1.S3Bucket{}
 	getResourceEventually(t, &s3Bucket, expectBucket, s3BucketName)
+
+	g.Expect(s3Bucket.Status.Ready).Should(Equal(expectSA && expectBucket))
 
 }
 

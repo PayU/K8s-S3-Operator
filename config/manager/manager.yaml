@@ -68,6 +68,8 @@ spec:
           value: test
         - name: AWS_ACCESS_KEY_ID
           value: test
+        - name: DEVMODE
+          value: "true"
       serviceAccountName: k8s-s3-operator-controller-manager
       volumes:
       - name: token
@@ -85,5 +87,5 @@ metadata:
   namespace: k8s-s3-operator-system 
 data:
   # Configuration values can be set as key-value properties
-  img: spec.spec.Containers[0].Image
-  serviceaccount: Spec.ServiceAccountName
+  img: spec.Containers[0].Image
+  serviceaccount: spec.serviceAccountName

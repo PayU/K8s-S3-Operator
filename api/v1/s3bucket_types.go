@@ -40,6 +40,7 @@ type S3BucketSpec struct {
 
 // S3BucketStatus defines the observed state of S3Bucket
 type S3BucketStatus struct {
+	Ready bool `json:"ready"`
 }
 
 //+kubebuilder:object:root=true
