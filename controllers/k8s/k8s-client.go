@@ -11,9 +11,10 @@ import (
 	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,7 +37,7 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 		if err == nil {
 			k.Log.Info("succseded to create new service account")
 			err = wait.ExponentialBackoff(wait.Backoff{Duration: config.WaitBackoffDuration(), Factor: config.WaitBackoffFactor(), Steps: config.WaitBackoffSteps()}, func() (done bool, err error) {
-				err = k.checkMatchingAppToServiceAccount(serviceAcountName, s3Selector, namespace)
+				err = k.checkMatchingAppControllerToServiceAccount(serviceAcountName, s3Selector, namespace)
 				k.Log.Info("in ExponentialBackoff checkMatchingAppToServiceAccount", "WaitBackoffDuration", config.WaitBackoffDuration(), "factor", config.WaitBackoffFactor(), "steps", config.WaitBackoffSteps(), "err", err)
 				return err == nil, err
 			})
@@ -54,7 +55,6 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 					}
 					return err == nil, err
 				})
-				k.Log.Info("test error", "stat", err != nil, "err", err, "statuscode", statuscode)
 				if err != nil { // didnt succeded to add service account to auth server
 					k.Log.Error(err, "error to add service account to auth server")
 					k.deleteServiceAccount(sa)
@@ -67,7 +67,7 @@ func (k *K8sClient) HandleSACreate(serviceAcountName string, namespace string, i
 		return err
 
 	} else { //service accoun exsist
-		err = k.checkMatchingAppToServiceAccount(serviceAcountName, s3Selector, namespace)
+		err = k.checkMatchingAppControllerToServiceAccount(serviceAcountName, s3Selector, namespace)
 		if err != nil {
 			k.Log.Error(err, "error service account is not match to app")
 		} else {
@@ -130,34 +130,48 @@ func (k *K8sClient) editServiceAccount(serviceAcountName string, namespace strin
 	return nil
 }
 
-func (k *K8sClient) checkMatchingAppToServiceAccount(SAName string, labelsFromS3 map[string]string, namespace string) error {
-	k.Log.V(1).Info("checkMatchingAppToServiceAccount", "service account name", SAName, "labelsFromS3", labelsFromS3)
-
+func (k *K8sClient) checkMatchingAppControllerToServiceAccount(SAName string, labelsFromS3 map[string]string, namespace string) error {
 	noMatchError := errors.New("app ServiceAccountName not match s3resource service account name")
-	k.Log.Info("looking for matching deployment", "deploy_name", labelsFromS3["app"])
 
+	//try to find deploy
 	deploy := appsv1.Deployment{}
 	err := k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &deploy)
-	if err == nil { //succeded to find deployment
+	if err == nil {
 		if deploy.Spec.Template.Spec.ServiceAccountName == SAName {
-			k.Log.Info("service account is match to app", "serviceaccount name", SAName, "labels", labelsFromS3)
 			return nil
 		}
-	} else { //didnt succeded to get deployment looks for pods
-		//get all pods in namespace that match the labels
-		appPods := v1.PodList{}
-		err = k.getPodList(namespace, labelsFromS3, &appPods)
-		if err == nil {
-			for _, appPod := range appPods.Items {
-				if appPod.Spec.ServiceAccountName != SAName {
-					err = noMatchError
-					k.Log.Error(err, "app ServiceAccountName not match s3resource service account name", "appPod.Spec.ServiceAccountName", appPod.Spec.ServiceAccountName, "s3-resouce SA", SAName)
-					return err
-				}
-				k.Log.Info("service account is match to app", "serviceaccount name", SAName, "labels", labelsFromS3)
-			}
-		}
+		return noMatchError
 	}
+	//try to find statefull set
+	sts := appsv1.StatefulSet{}
+	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &sts)
+	if err == nil {
+		if sts.Spec.Template.Spec.ServiceAccountName == SAName {
+			return nil
+		}
+		return noMatchError
+	}
+	//try to find job
+	job := batchv1.Job{}
+	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &job)
+	if err == nil {
+		if job.Spec.Template.Spec.ServiceAccountName == SAName {
+			return nil
+		}
+		return noMatchError
+	}
+	//try to find demonset
+	demonset := appsv1.DaemonSet{}
+	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &demonset)
+	if err == nil {
+		if demonset.Spec.Template.Spec.ServiceAccountName == SAName {
+			return nil
+		}
+		return noMatchError
+	}
+
+	err = errors.New("didnt find any match pod controller")
+	k.Log.Error(err, "serviceaccount name", SAName, "labels", labelsFromS3)
 	return err
 }
 
@@ -188,7 +202,7 @@ func (k *K8sClient) addSAToAuthServer(SAName string, namespace string, labelsFro
 	}
 	httpClient := http.Client{}
 
-	req, err := http.NewRequest("POST", config.PathToAC(), k.setBody(namespace, labelsFromS3))
+	req, err := http.NewRequest("POST", config.ServiceAccountApprovalUrl(), k.setBody(namespace, labelsFromS3))
 	if err != nil {
 		k.Log.Error(err, "error create request")
 		return 0, err
@@ -206,7 +220,7 @@ func (k *K8sClient) addSAToAuthServer(SAName string, namespace string, labelsFro
 		k.Log.Error(err, "error to read body")
 		return 0, err
 	}
-	return 	validateResponse(res.StatusCode, string(resBody), k.Log)
+	return validateResponseFromAuthServer(res.StatusCode, string(resBody), k.Log)
 
 }
 
@@ -218,17 +232,45 @@ func (k *K8sClient) setBody(namespace string, labelsFromS3 map[string]string) *b
 		return nil
 	}
 
-	deploy := appsv1.Deployment{}
-	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &deploy)
-	if err != nil {
-		k.Log.Error(err,"error to get deployment", "deploy_name",labelsFromS3["app"] )
+	podController := k.findPodsController(namespace, labelsFromS3)
+	if podController == nil {
+		k.Log.Error(errors.New("didnt find pod controller"), "error to gfind pod controller", "podController name", labelsFromS3["app"])
 		return nil
 	}
-	dataMap := cerateMapForBody(cm.Data, deploy, k.Log)
+	dataMap := cerateMapForBody(cm.Data, podController, k.Log)
 
 	body := convertMapToByte(dataMap, k.Log)
 	return body
 
+}
+func (k *K8sClient) findPodsController(namespace string, labelsFromS3 map[string]string) interface{} {
+	//try to find deploy
+	deploy := appsv1.Deployment{}
+	err := k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &deploy)
+	if err == nil {
+		return deploy
+	}
+	//try to find statefull set
+	sts := appsv1.StatefulSet{}
+	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &sts)
+	if err == nil {
+		return sts
+	}
+
+	//try to find job
+	job := batchv1.Job{}
+	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &job)
+	if err == nil {
+		return job
+	}
+
+	//try to find demonset
+	demonset := appsv1.DaemonSet{}
+	err = k.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: labelsFromS3["app"]}, &demonset)
+	if err == nil {
+		return demonset
+	}
+	return nil
 }
 
 func (k *K8sClient) getConfigMap(configMapName string, namespace string) (*v1.ConfigMap, error) {
@@ -240,18 +282,4 @@ func (k *K8sClient) getConfigMap(configMapName string, namespace string) (*v1.Co
 	}
 
 	return cm, nil
-}
-func (k *K8sClient) getPodList(namespace string, labelsFromS3 map[string]string, appPods *v1.PodList) error {
-	//get all pods in namespace that match the labels
-	err := k.List(context.Background(), appPods, &client.ListOptions{Namespace: namespace, LabelSelector: labels.SelectorFromSet(labelsFromS3)})
-	if err != nil {
-		k.Log.Error(err, "error to list app pods", "labels", labelsFromS3)
-		return err
-	}
-	if len(appPods.Items) == 0 {
-		err = errors.New("no app match to labels")
-		k.Log.Error(err, "no app match to labels", "labels", labelsFromS3)
-		return err
-	}
-	return nil
 }

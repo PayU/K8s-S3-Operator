@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  ports:
+  - port: 80
+    name: web
+  clusterIP: None
+  selector:
+    app: nginx
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-app
+  namespace: k8s-s3-operator-system
+spec:
+  serviceName: "nginx"
+  selector:
+    matchLabels:
+      app: test-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: app-test
+        image: apptest:new
+        ports:
+          - containerPort: 30000
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+      serviceAccountName: s3-operator-test-app
+
+---
+apiVersion: s3operator.payu.com/v1
+kind: S3Bucket
+metadata:
+  labels:
+    app.kubernetes.io/name: s3bucket
+    app.kubernetes.io/instance: s3bucket-sample
+    app.kubernetes.io/part-of: k8s-s3-operator
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: k8s-s3-operator
+  name: s3bucket-sample-app-testt
+  namespace: k8s-s3-operator-system
+spec:
+  encryption: false
+  serviceaccount: s3-operator-test-app
+  selector:
+    app: test-app 
