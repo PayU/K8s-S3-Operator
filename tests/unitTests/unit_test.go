@@ -27,20 +27,24 @@ func TestMain(m *testing.M) {
 	os.Exit(exitVal)
 }
 
-func TestGetValueFunc(t *testing.T) {
+func TestGetValueFuncRighrKey(t *testing.T) {
 	g := NewWithT(t)
 	deploy := appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: v1.PodTemplateSpec{Spec: v1.PodSpec{ServiceAccountName: "NameOfServiceAccount"}}}}
-	rightKey := "Spec.ServiceAccountName"
-	wrongKey := "Spec.Spec.field"
-	res,err := k8sClient.GetValue(rightKey,deploy,&logger)
-	t.Log("err",err,"res",res,deploy)
+	rightKey := "Spec.template.spec.ServiceAccountName"
+	res, err := k8sClient.GetValue(rightKey, deploy, &logger)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(res).To(Equal(""))
-
-	res,err = k8sClient.GetValue(wrongKey,deploy,&logger)
-	g.Expect(err).To(HaveOccurred())
-	g.Expect(res).To(Equal(nil))
-
+	g.Expect(res).To(Equal("NameOfServiceAccount"))
 
 
 }
+func TestGetValueFuncWrongKey(t *testing.T) {
+	g := NewWithT(t)
+	deploy := appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: v1.PodTemplateSpec{Spec: v1.PodSpec{ServiceAccountName: "NameOfServiceAccount"}}}}
+	wrongKey := "Spec.Spec.field"
+
+	res, err := k8sClient.GetValue(wrongKey, deploy, &logger)
+	g.Expect(err).To(HaveOccurred())
+	g.Expect(res).To(BeNil())
+
+}
+
