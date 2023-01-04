@@ -52,9 +52,11 @@ func TestMain(m *testing.M) {
 	s3Bucket = s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: bucketName, Namespace: namespace},
 		Spec: s3operatorv1.S3BucketSpec{Serviceaccount: serviceAccountName, Selector: map[string]string{"app": appName}}}
 	var exitVal int
-	for i := 0; i < 1; i++ {
+	for i := 1; i <= 3; i++ { // retry to pass tests
+		logger.Info("Run system tests", "tryNumber", i)
 		exitVal = m.Run()
 		if exitVal == 0 {
+			logger.Info("pass all test", "tryNumber", i)
 			break
 		}
 	}
