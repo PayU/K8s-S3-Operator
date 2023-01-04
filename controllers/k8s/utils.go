@@ -27,7 +27,7 @@ func validateResponseFromAuthServer(statusCode int, body string, Log *logr.Logge
 func cerateMapForBody(dataMap map[string]string, appPod interface{}, Log *logr.Logger) map[string]string {
 	for key, val := range dataMap {
 		Log.V(1).Info("inside loop of setBody", "key", key, "val", val)
-		val, err := GetValue(val, appPod, Log)
+		val, err := getValue(val, appPod, Log)
 		if err != nil {
 			Log.Error(err, "error to get value")
 			return nil
@@ -51,7 +51,7 @@ func convertMapToByte(dataMap map[string]string, Log *logr.Logger) *bytes.Reader
 
 }
 
-func GetValue(key string, obj interface{}, Log *logr.Logger) (ret interface{},err error) {
+func getValue(key string, obj interface{}, Log *logr.Logger) (ret interface{},err error) {
 	var val reflect.Value
 	// Use the recover function to handle panics.
 	defer func() {

@@ -28,7 +28,10 @@ sh ./hack/scripts/runLocalEnv.sh # you might need to run this as sudo if a regul
 **Set up on non-local env**
 
 Todo
-
+### **Run unit tests**
+   ```
+   go test ./controllers/... -v
+```
 ### **Run system tests**
 The tests run against your local kind cluster and the [localstack](https://github.com/localstack/localstack) service that run on your cluster.
 
