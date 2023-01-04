@@ -13,9 +13,7 @@ import (
 	"github.com/go-logr/logr"
 )
 
-
-
-func validateResponseFromAuthServer(statusCode int, body string, Log *logr.Logger)(int, error) {
+func validateResponseFromAuthServer(statusCode int, body string, Log *logr.Logger) (int, error) {
 	if statusCode != 200 {
 		err := errors.New("didnt succeded to add service account")
 		Log.Error(err, "error from auth server", "statusCode", statusCode, "body", body)
@@ -53,9 +51,8 @@ func convertMapToByte(dataMap map[string]string, Log *logr.Logger) *bytes.Reader
 
 }
 
-func getValue(key string, obj interface{}, Log *logr.Logger) (interface{}, error) {
+func getValue(key string, obj interface{}, Log *logr.Logger) (ret interface{},err error) {
 	var val reflect.Value
-	var err error
 	// Use the recover function to handle panics.
 	defer func() {
 		if r := recover(); r != nil {
@@ -65,7 +62,6 @@ func getValue(key string, obj interface{}, Log *logr.Logger) (interface{}, error
 	}()
 
 	splitedStr := strings.Split(key, ".")
-
 	val = reflect.ValueOf(obj)
 	for _, part := range splitedStr {
 		part = toUpperFirstLetter(part)

@@ -85,5 +85,5 @@ metadata:
   namespace: k8s-s3-operator-system 
 data:
   # Configuration values can be set as key-value properties
-  img: spec.spec.Containers[0].Image
-  serviceaccount: Spec.ServiceAccountName
+  img: spec.template.spec.Containers[0].Image
+  serviceaccount: spec.template.spec.ServiceAccountName

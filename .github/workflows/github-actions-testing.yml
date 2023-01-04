@@ -1,0 +1,64 @@
+name: ci tests
+run-name: ${{ github.actor }} in branch ${{ github.ref }} is testing out GitHub Actions 🚀
+on: [push]
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.19 
+      - name: run unit tests
+        run: go test ./controllers/... -v
+
+  system-and-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.19
+      - name: Install kustomize  and make tool
+        run: |
+         GO111MODULE=on go get sigs.k8s.io/kustomize/kustomize/v3@v3.8.9 
+         go get github.com/mitchellh/gox
+
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.4.0
+        with:
+          cluster_name: s3operator-cluster
+          config: ./hack/kindConfig.yaml
+      - uses: docker-practice/actions-setup-docker@master
+
+      - name: Build Docker image
+        run: make docker-build
+
+      - name: Load Docker image into Kind cluster
+        run: make kind-load-controller
+  
+      - name: deploy controller
+        run: make deploy
+
+      - name: deploy ingress controller
+        run: ./hack/scripts/deploy-ingress.sh
+
+      - name: run-local-aws-on-cluster
+        run: make run-local-aws-on-cluster
+      - name: Run make deploy system app
+        run: make deploy-system-test-app
+
+      - name: run system tests
+        run: go test ./tests/systemTest/system_test.go -v
+
+      - name: run integration tests
+        run: |
+          ./tests/integrationTests/testApp/uploadApp.sh
+          go test ./tests/integrationTests/integration_test.go -timeout 180s -v
+
+    
