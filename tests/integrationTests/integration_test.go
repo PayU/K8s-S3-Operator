@@ -172,7 +172,6 @@ func TestRes500FromAuthServer(t *testing.T) {
 	t.Log("TestRes500FromAuthServer")
 	t.Cleanup(Cleanup)
 	g := NewWithT(t)
-	// setCounterToZero(t)
 	//update auth server to err mode
 	t.Log("update auth server to err mode")
 	err := K8sApply("./yamlFiles/deployAuthServerErrMode.yaml")
@@ -204,15 +203,12 @@ func TestRes403FromAuthServer(t *testing.T) {
 	err = K8sApply("./yamlFiles/testflow1.yaml")
 	g.Expect(err).NotTo(HaveOccurred())
 
-	// time.Sleep(graceTimeAppChange * time.Second)
-
 	//check they created and running status
 	validateResourceStatus(t, true, false, true, false, "deploy")
 	// validateNumOfCallToAuthServer(t, 1)
 
 }
 func validateResourceStatus(t *testing.T, expectPodController bool, expectSA bool, expectBucket bool, expectPods bool, podController string) {
-	g := NewWithT(t)
 	switch podController {
 	case "deploy":
 		deploy := appsv1.Deployment{}
@@ -233,15 +229,22 @@ func validateResourceStatus(t *testing.T, expectPodController bool, expectSA boo
 	case "demonset":
 		demonset := appsv1.DaemonSet{}
 		getResourceEventually(t, &demonset, expectPodController, appName)
-		
+
 	}
 
 	sa := v1.ServiceAccount{}
 	getResourceEventually(t, &sa, expectSA, serviceAccountName)
 	s3Bucket := s3operatorv1.S3Bucket{}
 	getResourceEventually(t, &s3Bucket, expectBucket, s3BucketName)
+	if expectSA && expectBucket {
+		expectedStatus := "ready"
+		checkBucketStatus(t, expectedStatus)
+	}
+	if expectBucket && !expectSA {
+		expectedStatus := "failed"
+		checkBucketStatus(t, expectedStatus)
 
-	g.Expect(s3Bucket.Status.Ready).Should(Equal(expectSA && expectBucket))
+	}
 
 }
 
@@ -345,4 +348,14 @@ func checkPods(t *testing.T, expectPods bool) {
 		return deploy.Status.AvailableReplicas == int32(0)
 	}, 20*time.Second, 4*time.Second)
 
+}
+func checkBucketStatus(t *testing.T, expectStaus string) {
+	g := NewWithT(t)
+	s3Bucket := s3operatorv1.S3Bucket{}
+	g.Eventually(func() bool {
+		err := k8sClient.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: s3BucketName}, &s3Bucket)
+		t.Log("expectStaus", expectStaus, "s3Bucket.Status.Status", s3Bucket.Status.Status)
+		return err == nil && s3Bucket.Status.Status == expectStaus
+
+	}, 20*time.Second, 4*time.Second).Should(Equal(true))
 }

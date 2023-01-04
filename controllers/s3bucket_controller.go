@@ -85,8 +85,13 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = r.handleUpdateFlow(&s3Bucket.Spec, s3Bucket.Name, req.Namespace)
 	} else { //bucket not exists in aws, create
 		err = r.handleCreationFlow(&s3Bucket.Spec, s3Bucket.Name, req.Namespace)
-		s3Bucket.Status.Ready = (err == nil)
-		r.Client.Status().Update(context.Background(),&s3Bucket)
+		if err != nil {
+			s3Bucket.Status.Status = "failed"
+		} else {
+			s3Bucket.Status.Status = "ready"
+		}
+
+		r.Client.Status().Update(context.Background(), &s3Bucket)
 	}
 	if err != nil {
 		return ctrl.Result{Requeue: true, RequeueAfter: time.Duration(10 * time.Second)}, err
