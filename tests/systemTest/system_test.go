@@ -58,6 +58,8 @@ func TestMain(m *testing.M) {
 		if exitVal == 0 {
 			logger.Info("pass all test", "tryNumber", i)
 			break
+		}else{
+			time.Sleep(graceTime * time.Second)
 		}
 	}
 	logger.Info("finish to run all tests")
