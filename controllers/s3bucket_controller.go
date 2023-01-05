@@ -85,14 +85,8 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = r.handleUpdateFlow(&s3Bucket.Spec, s3Bucket.Name, req.Namespace)
 	} else { //bucket not exists in aws, create
 		err = r.handleCreationFlow(&s3Bucket.Spec, s3Bucket.Name, req.Namespace)
-		if err != nil {
-			s3Bucket.Status.Status = "failed"
-		} else {
-			s3Bucket.Status.Status = "ready"
-		}
-
-		r.Client.Status().Update(context.Background(), &s3Bucket)
 	}
+	r.updateStatus(err,&s3Bucket)
 	if err != nil {
 		return ctrl.Result{Requeue: true, RequeueAfter: time.Duration(10 * time.Second)}, err
 	}
@@ -135,4 +129,16 @@ func (r *S3BucketReconciler) handleUpdateFlow(bucketSpec *s3operatorv1.S3BucketS
 func (r *S3BucketReconciler) handleDeleteFlow(bucketSpec *s3operatorv1.S3BucketSpec, bucketName string, namespace string) (bool, error) {
 	isDelted, err := r.AwsClient.HandleBucketDeletion(bucketName)
 	return isDelted, err
+}
+func (r *S3BucketReconciler)updateStatus(err error, s3Bucket *s3operatorv1.S3Bucket){
+	if err != nil {
+		s3Bucket.Status.Status = "failed"
+	} else {
+		s3Bucket.Status.Status = "ready"
+	}
+
+	errToUpdate := r.Client.Status().Update(context.Background(), s3Bucket)
+	if errToUpdate != nil{
+		r.Log.Error(errToUpdate,"didnt succeded to update status")
+	}
 }
