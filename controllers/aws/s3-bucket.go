@@ -166,7 +166,7 @@ func (a *AwsClient) findIfDiffTags(tagsToUpdate map[string]string, tagsFromAws [
 func (a *AwsClient) checkIfOwnerBucketByTag(bucketName string) (bool, error) {
 	tagsFromAws, err := a.s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
 	if err != nil {
-		a.Log.Error(err, "error from GetBucketTagging")
+		a.Log.Error(err, "error from GetBucketTagging in checkIfOwnerBucketByTag")
 		return false, err
 	}
 	defaultTag := config.DefaultTag()

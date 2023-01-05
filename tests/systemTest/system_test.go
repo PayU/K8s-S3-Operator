@@ -63,11 +63,12 @@ func TestMain(m *testing.M) {
 			logger.Info("pass all test", "tryNumber", i)
 			break
 		} else {
+			cleanup()
 			time.Sleep(graceTime * time.Second)
 		}
 	}
 	logger.Info("finish to run all tests")
-
+	cleanup()
 	os.Exit(exitVal)
 }
 
@@ -143,8 +144,6 @@ func TestDeleteBucket(t *testing.T) {
 
 }
 func TestTryCreateBucketExsistNotManage(t *testing.T) {
-	t.Skip()
-	
 	t.Log("start TestTryCreateBucketExsistNotManage")
 	g := NewWithT(t)
 
@@ -153,25 +152,18 @@ func TestTryCreateBucketExsistNotManage(t *testing.T) {
 	checkBucketExsist(t, notManageBucketName, true)
 
 	createBucketResource(t,&s3BucketNotManage)
-	// g.Expect(s3BucketNotManage.Status.Status).Should(Equal())
+	checkBucketStatus(t,notManageBucketName,&s3BucketNotManage,"failed")
 
 }
 func TestValidateUpdateOnlyManageBuckets(t *testing.T) {
-	t.Skip()
-
 	t.Log("start TestValidateUpdateOnlyManageBuckets")
-	// g := NewWithT(t)
 	checkBucketExsist(t, notManageBucketName, true)
 	updateBucketTags(t, notManageBucketName,&s3BucketNotManage)
-
-	// g.Expect(s3BucketNotManage.Status.Status).Should(Equal())
-
+	checkBucketStatus(t,notManageBucketName,&s3BucketNotManage,"failed")
 
 }
 
 func TestValidateDeleteOnlyManageBuckets(t *testing.T) {
-	t.Skip()
-
 	t.Log("start TestValidateDeleteOnlyManageBuckets")
 	deleteBucket(t,notManageBucketName,&s3BucketNotManage)
 
@@ -227,4 +219,20 @@ func checkBucketTags(t *testing.T,bucketName string, expectedTags int){
 	g.Expect(err).NotTo(HaveOccurred())
 	t.Log("got tags from aws", tags.TagSet)
 	g.Expect(len(tags.TagSet)).Should(Equal(expectedTags))
+}
+func checkBucketStatus(t *testing.T, bucketName string,s3Bucket *s3operatorv1.S3Bucket, expectedSatus string){
+	g := NewWithT(t)
+	err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: bucketName}, s3Bucket)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(s3Bucket.Status.Status).Should(Equal(expectedSatus))
+
+}
+func cleanup(){
+	s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
+	s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(notManageBucketName)})
+
+	k8sClient.Delete(context.Background(),&s3Bucket)
+	k8sClient.Delete(context.Background(),&s3BucketNotManage)
+
+
 }
