@@ -84,11 +84,9 @@ func (a *AwsClient) HandleBucketUpdate(bucketName string, bucketSpec *s3operator
 	isOwner, err := a.isBucketManagedByOperator(bucketName)
 	if isOwner {
 		_, err = a.updateBucketTags(bucketName, bucketSpec.Tags)
-	} else {
-		if err == nil {
+	} else if err == nil {
 			err = errors.New("cant update bucket that not manage by operator")
 		}
-	}
 	a.Log.Info("finish to HandleBucketUpdate")
 	return err
 }
