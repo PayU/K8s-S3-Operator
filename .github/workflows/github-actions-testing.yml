@@ -53,6 +53,14 @@ jobs:
       - name: Run make deploy system app
         run: make deploy-system-test-app
 
+      - name: wait until localstack is up
+        uses: nev7n/wait_for_response@v1
+        with:
+          url: "http://localhost:4566/localstack/_localstack/health"
+          responseCode: 200
+          timeout: 60000
+          interval: 5000
+
       - name: run system tests
         run: go test ./tests/systemTest/system_test.go -v
 
