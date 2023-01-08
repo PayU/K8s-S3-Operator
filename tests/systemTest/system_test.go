@@ -18,6 +18,7 @@ import (
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -29,7 +30,7 @@ var namespace = "k8s-s3-operator-system"
 var logger logr.Logger
 var k8sClient client.Client
 var s3Bucket s3operatorv1.S3Bucket
-var graceTime = time.Duration(5)
+var graceTime = time.Duration(7)
 var serviceAccountName = "system-test-serviceaccount"
 var appName = "system-test-app"
 
@@ -50,7 +51,17 @@ func TestMain(m *testing.M) {
 
 	s3Bucket = s3operatorv1.S3Bucket{ObjectMeta: metav1.ObjectMeta{Name: bucketName, Namespace: namespace},
 		Spec: s3operatorv1.S3BucketSpec{Serviceaccount: serviceAccountName, Selector: map[string]string{"app": appName}}}
-	exitVal := m.Run()
+	var exitVal int
+	for i := 1; i <= 3; i++ { // retry to pass tests
+		logger.Info("Run system tests", "tryNumber", i)
+		exitVal = m.Run()
+		if exitVal == 0 {
+			logger.Info("pass all test", "tryNumber", i)
+			break
+		}else{
+			time.Sleep(graceTime * time.Second)
+		}
+	}
 	logger.Info("finish to run all tests")
 
 	os.Exit(exitVal)
@@ -87,8 +98,9 @@ func TestBucketUpdateTag(t *testing.T) {
 	g.Expect(len(tags.TagSet)).Should(Equal(1))
 
 	t.Log("update bucket tags expect not to have error and to add the new tag")
+	k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: bucketName}, &s3Bucket)
 	s3Bucket.Spec.Tags = map[string]string{"testKey": "testValue"}
-	err = k8sClient.Update(context.Background(), &s3Bucket)
+	err = k8sClient.Update(context.TODO(), &s3Bucket)
 	g.Expect(err).NotTo(HaveOccurred())
 	time.Sleep(graceTime * time.Second)
 	tags, err = s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})

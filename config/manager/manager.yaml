@@ -68,6 +68,8 @@ spec:
           value: test
         - name: AWS_ACCESS_KEY_ID
           value: test
+        - name: DEVMODE
+          value: "true"
       serviceAccountName: k8s-s3-operator-controller-manager
       volumes:
       - name: token

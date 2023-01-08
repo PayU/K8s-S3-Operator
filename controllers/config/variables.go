@@ -25,6 +25,8 @@ var waitBackoffSteps int64
 var pathToToken string
 var SERVICE_ACCOUNT_APPROVAL_URL string
 var configMapName string
+const STATUS_FAIL = "failed"
+const STATUS_READY = "ready"
 
 func init() {
 	var err error

@@ -172,15 +172,15 @@ func (k *K8sClient) checkMatchingAppControllerToServiceAccount(SAName string, la
 	}
 
 	err = errors.New("didnt find any match pod controller")
-	k.Log.Error(err, "serviceaccount name", SAName, "labels", labelsFromS3)
+	k.Log.Error(err, "didnt find any match pod controller", "serviceaccount_name", SAName, "labels", labelsFromS3)
 	return "", err
 }
 
 func (k *K8sClient) deleteServiceAccount(sa *v1.ServiceAccount) error {
-	k.Log.Info("Delete service account", "serviceaccount name", sa.Name)
+	k.Log.Info("Delete service account", "serviceaccount_name", sa.Name)
 	err := k.Delete(context.Background(), sa)
 	if err != nil {
-		k.Log.Error(err, "error to delete service account", "serviceaccount name", sa.Name)
+		k.Log.Error(err, "error to delete service account", "serviceaccount_name", sa.Name)
 	}
 	return err
 }

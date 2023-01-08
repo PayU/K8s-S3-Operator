@@ -40,6 +40,8 @@ type S3BucketSpec struct {
 
 // S3BucketStatus defines the observed state of S3Bucket
 type S3BucketStatus struct {
+	// +kubebuilder:default:=failed
+	Status string `json:"status"`
 }
 
 //+kubebuilder:object:root=true
