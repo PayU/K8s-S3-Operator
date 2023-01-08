@@ -59,7 +59,7 @@ func (a *AwsClient) HandleBucketDeletion(bucketToDelete string) (bool, error) {
 	a.Log.Info(" Start to delete s3 bucket from aws")
 	isBucketExists, err := a.IsBucketExists(bucketToDelete)
 	if isBucketExists {
-		isOwner := a.isBucketManagedByOperator(bucketToDelete)
+		isOwner, err := a.isBucketManagedByOperator(bucketToDelete)
 		if !isOwner {
 			return false, err
 		}
@@ -81,12 +81,13 @@ func (a *AwsClient) HandleBucketDeletion(bucketToDelete string) (bool, error) {
 
 func (a *AwsClient) HandleBucketUpdate(bucketName string, bucketSpec *s3operatorv1.S3BucketSpec) error {
 	a.Log.V(1).Info("HandleBucketUpdate function")
-	var err error
-	isOwner := a.isBucketManagedByOperator(bucketName)
+	isOwner, err := a.isBucketManagedByOperator(bucketName)
 	if isOwner {
 		_, err = a.updateBucketTags(bucketName, bucketSpec.Tags)
-	}else{
-		err = errors.New("cant update bucket that not manage by operator")
+	} else {
+		if err == nil {
+			err = errors.New("cant update bucket that not manage by operator")
+		}
 	}
 	a.Log.Info("finish to HandleBucketUpdate")
 	return err
@@ -165,21 +166,20 @@ func (a *AwsClient) findIfDiffTags(tagsToUpdate map[string]string, tagsFromAws [
 	a.Log.V(1).Info("returend from find diff Tags", "isDiffTags", isDiffTags, "newTags", newTags)
 	return isDiffTags, newTags
 }
-func (a *AwsClient) isBucketManagedByOperator(bucketName string) bool {
+func (a *AwsClient) isBucketManagedByOperator(bucketName string) (bool, error) {
 	tagsFromAws, err := a.s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
 	if err != nil {
 		a.Log.Error(err, "error from GetBucketTagging in checkIfOwnerBucketByTag")
-		return false
+		return false, err
 	}
 	defaultTag := config.DefaultTag()
 	for _, tag := range tagsFromAws.TagSet {
 		if defaultTag.GoString() == tag.GoString() {
-			return true
+			return true, nil
 		}
 	}
-	err = errors.New("bucket is not manage by operator")
-	a.Log.Error(err, "bucket is not manage by operator")
-	return false
+	a.Log.Info("bucket is not manage by the operator")
+	return false, nil
 
 }
 
