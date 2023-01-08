@@ -58,7 +58,7 @@ jobs:
         with:
           url: "http://localhost:4566/localstack/_localstack/health"
           responseCode: 200
-          timeout: 60000
+          timeout: 300000
           interval: 5000
 
       - name: run system tests
