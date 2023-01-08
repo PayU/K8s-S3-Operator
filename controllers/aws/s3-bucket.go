@@ -59,9 +59,8 @@ func (a *AwsClient) HandleBucketDeletion(bucketToDelete string) (bool, error) {
 	a.Log.Info(" Start to delete s3 bucket from aws")
 	isBucketExists, err := a.IsBucketExists(bucketToDelete)
 	if isBucketExists {
-		isOwner, err := a.checkIfOwnerBucketByTag(bucketToDelete)
+		isOwner := a.isBucketManagedByOperator(bucketToDelete)
 		if !isOwner {
-			a.Log.Error(err, "operator is not owner of bucket")
 			return false, err
 		}
 		err = a.cleanupsBucketContent(bucketToDelete)
@@ -82,7 +81,8 @@ func (a *AwsClient) HandleBucketDeletion(bucketToDelete string) (bool, error) {
 
 func (a *AwsClient) HandleBucketUpdate(bucketName string, bucketSpec *s3operatorv1.S3BucketSpec) error {
 	a.Log.V(1).Info("HandleBucketUpdate function")
-	isOwner, err := a.checkIfOwnerBucketByTag(bucketName)
+	var err error
+	isOwner := a.isBucketManagedByOperator(bucketName)
 	if isOwner {
 		_, err = a.updateBucketTags(bucketName, bucketSpec.Tags)
 	}
@@ -163,21 +163,21 @@ func (a *AwsClient) findIfDiffTags(tagsToUpdate map[string]string, tagsFromAws [
 	a.Log.V(1).Info("returend from find diff Tags", "isDiffTags", isDiffTags, "newTags", newTags)
 	return isDiffTags, newTags
 }
-func (a *AwsClient) checkIfOwnerBucketByTag(bucketName string) (bool, error) {
+func (a *AwsClient) isBucketManagedByOperator(bucketName string) bool {
 	tagsFromAws, err := a.s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
 	if err != nil {
 		a.Log.Error(err, "error from GetBucketTagging in checkIfOwnerBucketByTag")
-		return false, err
+		return false
 	}
 	defaultTag := config.DefaultTag()
 	for _, tag := range tagsFromAws.TagSet {
 		if defaultTag.GoString() == tag.GoString() {
-			return true, nil
+			return true
 		}
 	}
 	err = errors.New("bucket is not manage by operator")
 	a.Log.Error(err, "bucket is not manage by operator")
-	return false, err
+	return false
 
 }
 
