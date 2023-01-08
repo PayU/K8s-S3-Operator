@@ -22,6 +22,7 @@ import (
 
 	s3operatorv1 "github.com/PayU/K8s-S3-Operator/api/v1"
 	awsClient "github.com/PayU/K8s-S3-Operator/controllers/aws"
+	"github.com/PayU/K8s-S3-Operator/controllers/config"
 	k8s "github.com/PayU/K8s-S3-Operator/controllers/k8s"
 
 	"github.com/go-logr/logr"
@@ -79,6 +80,7 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	//succeded to get resource, check if need to create or update
 	isbucketExists, err := r.AwsClient.IsBucketExists(s3Bucket.Name)
 	if err != nil {
+		r.updateBucketResourceStatus(&s3Bucket,config.STATUS_FAIL)
 		return ctrl.Result{Requeue: true}, err
 	}
 	if isbucketExists {
@@ -86,10 +88,11 @@ func (r *S3BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	} else { //bucket not exists in aws, create
 		err = r.handleCreationFlow(&s3Bucket.Spec, s3Bucket.Name, req.Namespace)
 	}
-	r.updateStatus(err,&s3Bucket)
 	if err != nil {
+		r.updateBucketResourceStatus(&s3Bucket,config.STATUS_FAIL)
 		return ctrl.Result{Requeue: true, RequeueAfter: time.Duration(10 * time.Second)}, err
 	}
+	r.updateBucketResourceStatus(&s3Bucket,config.STATUS_READY)
 	return ctrl.Result{Requeue: false}, err
 }
 
@@ -130,13 +133,8 @@ func (r *S3BucketReconciler) handleDeleteFlow(bucketSpec *s3operatorv1.S3BucketS
 	isDelted, err := r.AwsClient.HandleBucketDeletion(bucketName)
 	return isDelted, err
 }
-func (r *S3BucketReconciler)updateStatus(err error, s3Bucket *s3operatorv1.S3Bucket){
-	if err != nil {
-		s3Bucket.Status.Status = "failed"
-	} else {
-		s3Bucket.Status.Status = "ready"
-	}
-
+func (r *S3BucketReconciler)updateBucketResourceStatus( s3Bucket *s3operatorv1.S3Bucket, status string){
+	s3Bucket.Status.Status = status
 	errToUpdate := r.Client.Status().Update(context.Background(), s3Bucket)
 	if errToUpdate != nil{
 		r.Log.Error(errToUpdate,"didnt succeded to update status")
