@@ -18,7 +18,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
-
 func (a *AwsClient) ValidateBucketName(name string) error {
 	if len(name) > 4 && name[:4] == "xn--" {
 		return errors.New("bucket name can't start with xn--")
@@ -60,7 +59,11 @@ func (a *AwsClient) HandleBucketDeletion(bucketToDelete string) (bool, error) {
 	a.Log.Info(" Start to delete s3 bucket from aws")
 	isBucketExists, err := a.IsBucketExists(bucketToDelete)
 	if isBucketExists {
-		err := a.cleanupsBucketContent(bucketToDelete)
+		isOwner, err := a.isBucketManagedByOperator(bucketToDelete)
+		if !isOwner {
+			return false, err
+		}
+		err = a.cleanupsBucketContent(bucketToDelete)
 		if err != nil {
 			a.Log.Error(err, "err to cleanup bucket")
 			return false, err
@@ -78,12 +81,15 @@ func (a *AwsClient) HandleBucketDeletion(bucketToDelete string) (bool, error) {
 
 func (a *AwsClient) HandleBucketUpdate(bucketName string, bucketSpec *s3operatorv1.S3BucketSpec) error {
 	a.Log.V(1).Info("HandleBucketUpdate function")
-	_, err := a.updateBucketTags(bucketName, bucketSpec.Tags)
-
+	isOwner, err := a.isBucketManagedByOperator(bucketName)
+	if isOwner {
+		_, err = a.updateBucketTags(bucketName, bucketSpec.Tags)
+	} else if err == nil {
+			err = errors.New("cant update bucket that not manage by operator")
+		}
 	a.Log.Info("finish to HandleBucketUpdate")
 	return err
 }
-
 
 func (a *AwsClient) IsBucketExists(name string) (bool, error) {
 	_, err := a.s3Client.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(name)})
@@ -158,6 +164,22 @@ func (a *AwsClient) findIfDiffTags(tagsToUpdate map[string]string, tagsFromAws [
 	a.Log.V(1).Info("returend from find diff Tags", "isDiffTags", isDiffTags, "newTags", newTags)
 	return isDiffTags, newTags
 }
+func (a *AwsClient) isBucketManagedByOperator(bucketName string) (bool, error) {
+	tagsFromAws, err := a.s3Client.GetBucketTagging(&s3.GetBucketTaggingInput{Bucket: aws.String(bucketName)})
+	if err != nil {
+		a.Log.Error(err, "error from GetBucketTagging in checkIfOwnerBucketByTag")
+		return false, err
+	}
+	defaultTag := config.DefaultTag()
+	for _, tag := range tagsFromAws.TagSet {
+		if defaultTag.GoString() == tag.GoString() {
+			return true, nil
+		}
+	}
+	a.Log.Info("bucket is not manage by the operator")
+	return false, nil
+
+}
 
 func (a *AwsClient) createBucket(bucketInput s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
 	a.Log.Info("Starting to create S3 bucket on AWS", "region", *bucketInput.CreateBucketConfiguration.LocationConstraint)
@@ -226,7 +248,8 @@ func (a *AwsClient) deleteBucket(bucketName string) (*s3.DeleteBucketOutput, err
 	res, err := a.s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
 	return res, err
 }
-//cleanupsBucketContent function - delete all the object that inside the bucket (required for deleting bucket)
+
+// cleanupsBucketContent function - delete all the object that inside the bucket (required for deleting bucket)
 func (a *AwsClient) cleanupsBucketContent(bucketName string) error {
 	a.Log.V(1).Info("CleanupsBucket function")
 
