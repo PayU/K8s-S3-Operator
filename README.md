@@ -47,7 +47,7 @@ The integretion tests test the functionality of integration between deploying/up
 
 run tests:
 
-1. deploy local env -> see ([Quick-Start](##Quick-Start))
+1. deploy local env -> see ([Quick-Start](#quick-start))
 2. Run
 ```bash
     sh ./tests/integrationTests/testApp/uploadApp.sh
